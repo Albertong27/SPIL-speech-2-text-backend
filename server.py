@@ -93,7 +93,7 @@ async def transcribe_streaming(websocket):
                 transcript = result.alternatives[0].transcript
                 if result.is_final:
                     print(f"final: {transcript}")
-                    await asyncio.create_task(send_transcript(websocket, f"\nfinal: {transcript}"))
+                    await asyncio.create_task(send_transcript(websocket, f"final: {transcript}"))
                     transcript_buffer += transcript + "\n"
                 else:
                     print(f"interim: {transcript}")
