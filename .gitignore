@@ -1,0 +1,5 @@
+*.mp3
+*.py
+!server.py
+*.wav
+aiproject-itdev-0190cfc63da2.json
