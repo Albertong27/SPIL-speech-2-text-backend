@@ -12,23 +12,30 @@ class MyEventHandler(TranscriptResultStreamHandler):
     def __init__(self, stream, websocket: WebSocket):
         super().__init__(stream)
         self.websocket = websocket
+        self.partial_sentence = []
+        self.last_partial_transcript = ""
 
     async def handle_transcript_event(self, transcript_event: TranscriptEvent):
-        results = transcript_event.transcript.results
-        for result in results:
-            if result.is_partial:
-                continue
-            for alt in result.alternatives:
-                for item in alt.items:
-                    if item.item_type == "pronunciation":
-                        raw_word = item.content
-                        print(f"raw: {raw_word}")
-                        if self.websocket:
-                            await self.websocket.send_text(raw_word)
-                transcript = alt.transcript.strip()
-                print(f"final: {transcript}")
+        for sentence in transcript_event.transcript.results:
+            if sentence.is_partial:
+                current_partial = ""
+                for alt in sentence.alternatives:
+                    current_partial = alt.transcript.strip()
+                
+                if current_partial != self.last_partial_transcript:
+                    self.last_partial_transcript = current_partial
+                    print(f"Partial: {current_partial}")
+                    if self.websocket:
+                        await self.websocket.send_text(current_partial)
+            else:
+                for alt in sentence.alternatives:
+                    self.partial_sentence.append(alt.transcript.strip())
+                final_sentence = " ".join(self.partial_sentence).strip()
+                print(f"Final: {final_sentence}")
                 if self.websocket:
-                    await self.websocket.send_text(f"final: {transcript}")
+                    await self.websocket.send_text(f"final: {final_sentence}")
+                self.partial_sentence = []
+                self.last_partial_transcript = ""
 
 async def browser_audio_stream(websocket: WebSocket, transcribe_stream):
     try:
