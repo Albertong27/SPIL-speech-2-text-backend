@@ -3,6 +3,7 @@ import asyncio
 import uvicorn
 import sounddevice
 from loguru import logger
+from pymongo import MongoClient
 from datetime import datetime
 from fastapi import FastAPI, WebSocket
 from fastapi.websockets import WebSocketDisconnect
@@ -21,6 +22,9 @@ from amazon_transcribe.exceptions import (
 
 # FastAPI Configuration
 app = FastAPI()
+
+# MongoDB Configuration
+# client = MongoClient()
 
 # Log Configuration
 log_path = "aistudio/apps/logs/app.log"
@@ -53,22 +57,26 @@ class AWSTranscription(TranscriptResultStreamHandler):
                             await self.ws.send_text("listening")
                 else:
                     if self.ws:
-                        await self.ws.send_text(f"transcription: {self.output}. ")
+                        time = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                        await self.ws.send_json({
+                            "datetime": time,
+                            "transcription": self.output
+                        })
                     await self.handle_txt_output()
                     self.output = ""
         except Exception as e:
             logger.exception(f"Error while handling transcript event")
 
     async def handle_db_output(self):
-        time = datetime.now().strftime('%H:%M:%S')
+        time = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
 
         data = {
-            "time": time,
+            "datetime": time,
             "transcript": self.output
         }
 
-        # sending 'data' to mongoDB here
-        
+        # [MSG] sending 'data' to mongoDB here
+
 
     async def handle_txt_output(self):
         try:
@@ -160,13 +168,6 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
         handler.close_txt_output()
 
 
-# Root Endpoints (Testing)
-@app.get("/")
-def root():
-    logger.info("Root endpoint accessed")
-    return {"message": "Hello, World!"}
-
-
 # # Event Startup
 # @app.on_event("startup")
 # async def startup_event():
@@ -179,6 +180,13 @@ def root():
 #     logger.warning("Server is shutting down...")
 #     logger.info("Cleaning up resources...")
 #     logger.info("Shutdown process complete.")
+
+
+# Root Endpoints (Testing)
+@app.get("/")
+def root():
+    logger.info("Root endpoint accessed")
+    return {"message": "Hello, World!"}
 
 
 # Microphone Audio Inputs Endpoints
@@ -207,6 +215,61 @@ async def browser_transcription(websocket: WebSocket):
         logger.error(f"Unexpected error in browser transcription")
 
 
+# Summarizer Endpoints
+@app.websocket("/summarizer")
+async def summarize_transcription(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        logger.info("Client connected to summarizer endpoint")
+        while True:
+            data = await websocket.receive_json()
+            start_datetime = data.get("start_datetime")
+            end_datetime = data.get("end_datetime")
+
+            try:
+                start_datetime = datetime.strptime(start_datetime, '%d-%m-%Y %H:%M:%S')
+                end_datetime = datetime.strptime(end_datetime, '%d-%m-%Y %H:%M:%S')
+            except ValueError as e:
+                logger.error(f"Invalid datetime format: {e}")
+                await websocket.send_text("Invalid datetime format. Use 'DD-MM-YYYY HH:MM:SS'")
+                continue
+
+            try:
+                # [MSG] This is MongoDB query
+                # db = client["your_database_name"]
+                # collection = db["your_collection_name"] 
+                # query = {
+                #     "time": {
+                #         "$gte": start_datetime.strftime("%H:%M:%S"),
+                #         "$lte": end_datetime.strftime("%H:%M:%S"),
+                #     }
+                # }
+                # results = list(collection.find(query, {"_id": 0})) 
+                
+                # [MSG] This is sending data to front-end
+                # if results:
+                    # await websocket.send_json({
+                    #     "datetime": time, 
+                    #     "data": results
+                    #     })
+                # else:
+                #     await websocket.send_json({"status": "no_data", "message": "No transcripts found in this range"})
+                
+                # [MSG] Dont forget to remove this
+                pass
+            except Exception as e:
+                logger.exception("Error querying MongoDB")
+                await websocket.send_json({
+                    "status": "error", 
+                    "message": "Internal server error. Please try again later"
+                    })
+
+    except WebSocketDisconnect:
+        logger.warning("Client disconnected from summarizer endpoint")
+    except Exception as e:
+        logger.error(f"Unexpected error in summarizer")
+
+
 # Main Start
 if __name__ == "__main__":
     try:
@@ -214,7 +277,3 @@ if __name__ == "__main__":
         uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
     except Exception as e:
         logger.error(f"An unexpected error occurred")
-
-
-# MASUKIN OUTPUT TXT
-# URUS SUMMARIZER
