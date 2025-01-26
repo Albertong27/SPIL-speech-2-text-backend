@@ -3,8 +3,11 @@ import asyncio
 import uvicorn
 import sounddevice
 from loguru import logger
+from bson import ObjectId
 from pymongo import MongoClient
 from datetime import datetime
+from dotenv import load_dotenv
+from pymongo.server_api import ServerApi
 from fastapi import FastAPI, WebSocket
 from fastapi.websockets import WebSocketDisconnect
 from amazon_transcribe.model import TranscriptEvent
@@ -23,17 +26,22 @@ from amazon_transcribe.exceptions import (
 # FastAPI Configuration
 app = FastAPI()
 
+load_dotenv()
+
 # MongoDB Configuration
-# client = MongoClient()
+mongo_key = os.getenv("DB_HOST")     # insert the mongo key
+client = MongoClient(mongo_key, server_api=ServerApi('1'))
+db = client.spil    # this 'spil' is the database names
+db_table = db.data  # this 'data' is the collection names of db
 
 # Log Configuration
-log_path = "aistudio/apps/logs/app.log"
+log_path = "FILE_PATH/app.log"
 os.makedirs(os.path.dirname(log_path), exist_ok=True)
 logger.add(log_path, rotation="10 MB", retention="30 days", compression="zip")
 
 # Txt Configuration
 file_name = datetime.now().strftime('%d-%m-%Y %H.%M.%S')
-txt_dir_name = "aistudio/apps/output/"
+txt_dir_name = "FILE_PATH/"
 txt_path = f"{txt_dir_name}{file_name}.txt"
 
 
@@ -56,27 +64,33 @@ class AWSTranscription(TranscriptResultStreamHandler):
                         if self.ws:
                             await self.ws.send_text("listening")
                 else:
-                    if self.ws:
-                        time = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
-                        await self.ws.send_json({
-                            "datetime": time,
-                            "transcription": self.output
-                        })
-                    await self.handle_txt_output()
-                    self.output = ""
+                    if self.output != '':
+                        if self.ws:
+                            time = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+                            await self.ws.send_json({
+                                "datetime": time,
+                                "transcription": self.output
+                            })
+                        await self.handle_db_output()
+                        await self.handle_txt_output()
+                        self.output = ""
         except Exception as e:
             logger.exception(f"Error while handling transcript event")
 
     async def handle_db_output(self):
-        time = datetime.now().strftime('%d-%m-%Y %H:%M:%S')
+        date = datetime.now().strftime('%d-%m-%Y')
+        time = datetime.now().strftime('%H:%M:%S')
 
-        data = {
-            "datetime": time,
+        transcript_data = {
+            "time": time,
             "transcript": self.output
         }
 
-        # [MSG] sending 'data' to mongoDB here
-
+        db_table.update_one(
+            {"date": date},
+            {"$push": {"meeting": transcript_data}},
+            upsert=True
+        )
 
     async def handle_txt_output(self):
         try:
@@ -85,7 +99,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
         except Exception as e:
             self.txt_file.close()
             logger.exception(f"Error while writing transcript to txt file")
-        
+
     def close_txt_output(self):
         try:
             self.txt_file.close()
@@ -104,7 +118,7 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
             media_encoding="pcm",
         )
         logger.info(f"Started transcription stream for source: {source}")
-    except (UnknownServiceException, BadRequestException, LimitExceededException, InternalFailureException, 
+    except (UnknownServiceException, BadRequestException, LimitExceededException, InternalFailureException,
             ConflictException, ServiceUnavailableException, SerializationException) as e:
         logger.error(f"Error starting transcription stream")
         return
@@ -118,7 +132,8 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
                 input_queue = asyncio.Queue()
 
                 def callback(indata, frame_count, time_info, status):
-                    loop.call_soon_threadsafe(input_queue.put_nowait, (bytes(indata), status))
+                    loop.call_soon_threadsafe(
+                        input_queue.put_nowait, (bytes(indata), status))
 
                 stream = sounddevice.RawInputStream(
                     channels=1,
@@ -203,7 +218,7 @@ async def mic_transcription(websocket: WebSocket):
 
 
 # Browser Audio Inputs Endpoints
-@app.websocket("/browser-transcribe")
+@app.websocket("/aws-browser-transcribe")
 async def browser_transcription(websocket: WebSocket):
     await websocket.accept()
     try:
@@ -225,44 +240,65 @@ async def summarize_transcription(websocket: WebSocket):
             data = await websocket.receive_json()
             start_datetime = data.get("start_datetime")
             end_datetime = data.get("end_datetime")
+            # NOTE
+            # breakout_room = data.get("breakout_room")
 
             try:
-                start_datetime = datetime.strptime(start_datetime, '%d-%m-%Y %H:%M:%S')
-                end_datetime = datetime.strptime(end_datetime, '%d-%m-%Y %H:%M:%S')
+                start_datetime = datetime.strptime(
+                    start_datetime, '%d-%m-%Y %H:%M:%S')
+                end_datetime = datetime.strptime(
+                    end_datetime, '%d-%m-%Y %H:%M:%S')
             except ValueError as e:
                 logger.error(f"Invalid datetime format: {e}")
-                await websocket.send_text("Invalid datetime format. Use 'DD-MM-YYYY HH:MM:SS'")
+                await websocket.send_json({
+                    "status": "error",
+                    "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM:SS'."
+                })
                 continue
 
             try:
-                # [MSG] This is MongoDB query
-                # db = client["your_database_name"]
-                # collection = db["your_collection_name"] 
-                # query = {
-                #     "time": {
-                #         "$gte": start_datetime.strftime("%H:%M:%S"),
-                #         "$lte": end_datetime.strftime("%H:%M:%S"),
-                #     }
-                # }
-                # results = list(collection.find(query, {"_id": 0})) 
-                
-                # [MSG] This is sending data to front-end
-                # if results:
-                    # await websocket.send_json({
-                    #     "datetime": time, 
-                    #     "data": results
-                    #     })
-                # else:
-                #     await websocket.send_json({"status": "no_data", "message": "No transcripts found in this range"})
-                
-                # [MSG] Dont forget to remove this
-                pass
+                date = start_datetime.strftime('%d-%m-%Y')
+                transcripts = db_table.find_one(
+                    {"date": date}, {"_id": 0, "meeting": 1})
+
+                if not transcripts or "meeting" not in transcripts:
+                    logger.warning("No meetings found in the database")
+                    await websocket.send_json({
+                        "status": "warning",
+                        "message": "Can't find the meetings name"
+                    })
+
+                filtered_transcripts = [
+                    item["transcript"]
+                    for item in transcripts["meeting"]
+                    if start_datetime.strftime('%H:%M:%S') <= item["time"] <= end_datetime.strftime('%H:%M:%S')
+                ]
+
+                if not filtered_transcripts:
+                    logger.warning(
+                        f"No data found for time range {start_datetime} - {end_datetime}")
+                    await websocket.send_json({
+                        "status": "no_data",
+                        "message": "No transcripts found within the provided time range."
+                    })
+                    continue
+
+                transcript = " ".join(filtered_transcripts)
+
+                await websocket.send_text(transcript)
+
+            except ValueError as ve:
+                logger.error(f"Error: {ve}")
+                await websocket.send_json({
+                    "status": "error",
+                    "message": str(ve)
+                })
             except Exception as e:
                 logger.exception("Error querying MongoDB")
                 await websocket.send_json({
-                    "status": "error", 
+                    "status": "error",
                     "message": "Internal server error. Please try again later"
-                    })
+                })
 
     except WebSocketDisconnect:
         logger.warning("Client disconnected from summarizer endpoint")
@@ -277,3 +313,9 @@ if __name__ == "__main__":
         uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
     except Exception as e:
         logger.error(f"An unexpected error occurred")
+
+
+# MongoDB Installation
+# https://youtu.be/MyIiM7z_j_Y?si=uU7Hx9E5nOaf3eyG
+# MongoDB Tutorial
+# https://youtu.be/qWYx5neOh2s?si=ph4MEtIXQLa94DPf
