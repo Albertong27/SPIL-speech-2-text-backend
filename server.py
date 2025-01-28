@@ -29,8 +29,14 @@ app = FastAPI()
 load_dotenv()
 
 # MongoDB Configuration
-mongo_key = os.getenv("DB_HOST")     # insert the mongo key
-client = MongoClient(mongo_key, server_api=ServerApi('1'))
+# For cloud
+# mongo_key = os.getenv("DB_HOST")     # insert the mongo key
+# client = MongoClient(mongo_key, server_api=ServerApi('1'))
+# db = client.spil    # this 'spil' is the database names
+# db_table = db.data  # this 'data' is the collection names of db
+
+# For local connectiom
+client = MongoClient("mongodb://localhost:27017/")
 db = client.spil    # this 'spil' is the database names
 db_table = db.data  # this 'data' is the collection names of db
 
@@ -45,7 +51,7 @@ txt_dir_name = "FILE_PATH/"
 txt_path = f"{txt_dir_name}{file_name}.txt"
 
 
-class AWSTranscription(TranscriptResultStreamHandler):
+class AWSTranscription(TranscriptResultStreamHandler):                     
     def __init__(self, stream, websocket: WebSocket):
         super().__init__(stream)
         self.ws = websocket
