@@ -7,7 +7,7 @@ import sounddevice
 import markdown
 from loguru import logger
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
@@ -76,6 +76,10 @@ class AWSTranscription(TranscriptResultStreamHandler):
         self.txt_file = open(txt_path, "a", encoding="utf-8")
         logger.info("Txt output file has been created")
 
+        # TIMER
+        self.marked_timer = datetime.now()
+        logger.info(f"Marked timer : {self.marked_timer.strftime('%H:%M')}") 
+
     async def handle_transcript_event(self, event: TranscriptEvent):
         try:
             for result in event.transcript.results:
@@ -91,6 +95,15 @@ class AWSTranscription(TranscriptResultStreamHandler):
                             await self.ws.send_json({
                                 "datetime": time,
                                 "transcription": self.output
+                            })
+
+                        if datetime.now >= self.marked_timer + timedelta(hours=3):
+                            logger.warning("3 hours timer is on. Refreshing...")
+                            self.marked_timer = datetime.now()
+                            logger.info(f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
+                            await self.ws.send_json({
+                                "status": "warning",
+                                "massage": "3 hours timer is on. Refreshing..."
                             })
 
                         asyncio.create_task(self.handle_db_logging)
