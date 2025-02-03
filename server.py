@@ -12,6 +12,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from pymongo.server_api import ServerApi
 from fastapi import FastAPI, WebSocket, Form
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketDisconnect
 from amazon_transcribe.model import TranscriptEvent
 from amazon_transcribe.client import TranscribeStreamingClient
@@ -28,6 +29,14 @@ from amazon_transcribe.exceptions import (
 
 # FastAPI Configuration
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 load_dotenv()
 
