@@ -100,7 +100,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
                                 "transcription": self.output
                             })
 
-                            if datetime.now() >= (self.marked_timer + timedelta(hours=3.30)):
+                            if datetime.now() >= (self.marked_timer + timedelta(hours=3, minutes=30)):
                                 logger.warning(
                                     "3 hours timer is on. Refreshing...")
                                 self.marked_timer = datetime.now()
