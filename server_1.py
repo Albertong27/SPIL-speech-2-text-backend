@@ -42,7 +42,7 @@ app.add_middleware(
 # MongoDB Atlas Configuration
 load_dotenv()
 
-# client = MongoClient("", server_api=ServerApi('1'))       # MongoDB atlas     (cloud)
+client = MongoClient("", server_api=ServerApi('1'))         # MongoDB atlas     (cloud)
 # client = MongoClient("mongodb://localhost:27017/")        # MongoDB compass   (local)
 
 db = client.spil
@@ -100,61 +100,54 @@ class AWSTranscription(TranscriptResultStreamHandler):
 
                         self.output = ""
 
-        except Exception as e:
-            logger.exception(f"Error while handling transcript event {e}")
-
-    async def handle_db_logging(self):
-        try:
-            global id_room
-            
-            data = {
-                "raw_input": self.output,
-                "id_room": str(id_room)
-            }
-            response = requests.post(self.url_log, data=data, timeout=10.0)
-            response.raise_for_status()
-
-        except requests.exceptions.HTTPError as http_err:
-            logger.warning(f"HTTP error occurred: {http_err}")
-            pass
-        except requests.exceptions.ConnectionError as conn_err:
-            logger.warning(f"Connection error occurred: {conn_err}")
-            pass
-        except requests.exceptions.Timeout as timeout_err:
-            logger.warning(f"Timeout error occurred: {timeout_err}")
-            pass
-        except requests.exceptions.RequestException as req_err:
-            logger.warning(f"An error occurred: {req_err}")  
-            pass
-
-    async def handle_db_output(self):
-        try:
-            date = datetime.now().strftime('%d-%m-%Y')
-            time = datetime.now().strftime('%H:%M')
-
-            coll_data.insert_one({
-                "date":date,
-                "time": time,
-                "transcript": self.output
-            })
-
         except ConnectionFailure as e:
             logger.error(f'Error saving data to mongoDB: {e}')
+        except Exception as e:
+            logger.exception(f"Error while handling transcript event {e}")
+        except requests.exceptions.HTTPError as e:
+            logger.warning(f"HTTP error occurred: {e}")
+            pass
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"Connection error occurred: {e}")
+            pass
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Timeout error occurred: {e}")
+            pass
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"An error occurred: {e}")  
+            pass 
+
+    async def handle_db_logging(self):
+        global id_room
+        
+        data = {
+            "raw_input": self.output,
+            "id_room": str(id_room)
+        }
+        response = requests.post(self.url_log, data=data, timeout=10.0)
+        response.raise_for_status()
+
+    async def handle_db_output(self):
+        date = datetime.now().strftime('%d-%m-%Y')
+        time = datetime.now().strftime('%H:%M')
+
+        coll_data.insert_one({
+            "date":date,
+            "time": time,
+            "transcript": self.output
+        })
 
     async def handle_txt_output(self):
         try:
             self.txt_file.write(self.output + "\n")
             self.txt_file.flush()
-        except Exception as e:
+        except:
             self.txt_file.close()
-            logger.exception("Error while writing transcript to txt file {e}")
+            logger.error("Error while writing into Txt output.")
 
     def close_txt_output(self):
-        try:
-            self.txt_file.close()
-            logger.info("Txt output file has been closed")
-        except Exception as e:
-            logger.exception("Error while closing txt file {e}")
+        self.txt_file.close()
+        logger.info("Txt output file has been closed")
 
 
 # Audio Transcription
