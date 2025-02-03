@@ -1,17 +1,18 @@
 import os
-import asyncio
 import httpx
+import requests
+import asyncio
 import uvicorn
 import sounddevice
 import markdown
-from pymongo.errors import ConnectionFailure
 from loguru import logger
 from bson import ObjectId
-from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from fastapi import FastAPI, WebSocket, Form
+from pymongo.errors import ConnectionFailure
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketDisconnect
 from amazon_transcribe.model import TranscriptEvent
@@ -38,41 +39,49 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# MongoDB Configuration
 load_dotenv()
 
-# MongoDB Configuration
-# For cloud
-# mongo_key = os.getenv("DB_HOST")     # insert the mongo key
-# client = MongoClient(mongo_key, server_api=ServerApi('1'))
-# db = client.spil    # this 'spil' is the database names
-# db_table = db.data  # this 'data' is the collection names of db
-
-# For local connectiom
+# client = MongoClient("", server_api=ServerApi('1'))       # MongoDB atlas     (cloud)
+# MongoDB compass   (local)
 client = MongoClient("mongodb://localhost:27017/")
-db = client.spil    # this 'spil' is the database names
-db_table = db.data  # this 'data' is the collection names of db
-db_table1 = db.summary  # Hasil Summarize
 
-# Log Configuration
-log_path = "FILE_PATH/app.log"
+db = client.spil
+coll_data = db.data
+coll_summary = db.summary
+
+# Logging Configuration
+log_dir = "app/"
+log_name = "app.log"
+log_path = log_dir + log_name
 os.makedirs(os.path.dirname(log_path), exist_ok=True)
 logger.add(log_path, rotation="10 MB", retention="30 days", compression="zip")
 
 # Txt Configuration
-file_name = datetime.now().strftime('%d-%m-%Y %H.%M')
-txt_dir_name = "FILE_PATH/"
-txt_path = f"{txt_dir_name}{file_name}.txt"
+txt_name = datetime.now().strftime('%d-%m-%Y %H.%M')
+txt_dir = "txt/"
+txt_path = f"{txt_dir}{txt_name}.txt"
+os.makedirs(os.path.dirname(txt_path), exist_ok=True)
+
+# ID Room Configuration
+id_room = 0
 
 
+# Transcription Object Class
 class AWSTranscription(TranscriptResultStreamHandler):
     def __init__(self, stream, websocket: WebSocket):
         super().__init__(stream)
         self.ws = websocket
         self.output = ""
-        # Txt Output
-        os.makedirs(os.path.dirname(txt_dir_name), exist_ok=True)
+        self.url_log = "http://192.168.1.50:19110/api/sac/log"
         self.txt_file = open(txt_path, "a", encoding="utf-8")
         logger.info("Txt output file has been created")
+
+        self.prev_output = ""
+
+        # TIMER
+        self.marked_timer = datetime.now()
+        logger.info(f"Marked timer : {self.marked_timer.strftime('%H:%M')}")
 
     async def handle_transcript_event(self, event: TranscriptEvent):
         try:
@@ -83,56 +92,93 @@ class AWSTranscription(TranscriptResultStreamHandler):
                         if self.ws:
                             await self.ws.send_text("listening")
                 else:
-                    if self.output != '':
+                    if self.output != '' and self.prev_output != self.output:
                         if self.ws:
                             time = datetime.now().strftime('%d-%m-%Y %H:%M')
                             await self.ws.send_json({
                                 "datetime": time,
                                 "transcription": self.output
                             })
-                        await self.handle_db_output()
+
+                            if datetime.now() >= (self.marked_timer + timedelta(hours=3, minutes=30)):
+                                logger.warning(
+                                    "3 hours timer is on. Refreshing...")
+                                self.marked_timer = datetime.now()
+                                logger.info(
+                                    f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
+                                await self.ws.send_json({
+                                    "status": "warning",
+                                    "massage": "3 hours timer is on. Refreshing..."
+                                })
+
+                        asyncio.create_task(self.handle_db_logging())
+                        asyncio.create_task(self.handle_db_output())
+                        # await self.handle_db_logging()
+                        # await self.handle_db_output()
+
                         await self.handle_txt_output()
-                        self.output = ""
+
+                        # self.output = ""
+                        self.prev_output = self.output
+
+        except ConnectionFailure as e:
+            logger.error(f'Error saving data to mongoDB: {e}')
         except Exception as e:
-            logger.exception(f"Error while handling transcript event")
+            logger.exception(f"Error while handling transcript event {e}")
+        except requests.exceptions.HTTPError as e:
+            logger.warning(f"HTTP error occurred: {e}")
+            pass
+        except requests.exceptions.ConnectionError as e:
+            logger.warning(f"Connection error occurred: {e}")
+            pass
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Timeout error occurred: {e}")
+            pass
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"An error occurred: {e}")
+            pass
+
+    async def handle_db_logging(self):
+        global id_room
+
+        data = {
+            "raw_input": self.output,
+            "id_room": str(id_room)
+        }
+        response = requests.post(self.url_log, data=data, timeout=10.0)
+        response.raise_for_status()
 
     async def handle_db_output(self):
         date = datetime.now().strftime('%d-%m-%Y')
         time = datetime.now().strftime('%H:%M')
 
-        db_table.insert_one({"date": date,
-                             "time": time,
-                             "transcript": self.output})
+        coll_data.insert_one({
+            "date": date,
+            "time": time,
+            "transcript": self.output
+        })
 
     async def handle_txt_output(self):
         try:
             self.txt_file.write(self.output + "\n")
             self.txt_file.flush()
-        except Exception as e:
+        except:
             self.txt_file.close()
-            logger.exception(f"Error while writing transcript to txt file")
+            logger.error("Error while writing into Txt output.")
 
     def close_txt_output(self):
-        try:
-            self.txt_file.close()
-            logger.info("Txt output file has been closed")
-        except Exception as e:
-            logger.exception(f"Error while closing txt file")
+        self.txt_file.close()
+        logger.info("Txt output file has been closed")
 
 
+# Audio Transcription
 async def audio_transcription(websocket: WebSocket, source: str = "mic"):
     client = TranscribeStreamingClient(region="us-east-1")
 
-    try:
-        stream = await client.start_stream_transcription(
-            language_code="id-ID",
-            media_sample_rate_hz=16000,
-            media_encoding="pcm",
-        )
-        logger.info(f"Started transcription stream for source: {source}")
-    except (UnknownServiceException, BadRequestException, LimitExceededException, InternalFailureException,
-            ConflictException, ServiceUnavailableException, SerializationException) as e:
-        logger.error(f"Error starting transcription stream")
+    stream = await aws_connection(client)
+
+    if not stream:
+        await websocket.send_json({"error": "Failed to connect to Amazon Transcribe service after multiple attempts."})
         return
 
     handler = AWSTranscription(stream.output_stream, websocket)
@@ -154,59 +200,60 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
                     blocksize=512,
                     dtype="int16",
                 )
-                try:
-                    with stream:
-                        while True:
-                            indata, status = await input_queue.get()
-                            yield indata, status
-                except Exception as e:
-                    logger.error(f"Microphone input error")
-                    raise
+                with stream:
+                    while True:
+                        indata, status = await input_queue.get()
+                        yield indata, status
 
             async def send_audio():
                 async for chunk, status in audio_source():
-                    try:
-                        await stream.input_stream.send_audio_event(audio_chunk=chunk)
-                    except Exception as e:
-                        logger.error(f"Error sending audio from mic")
-                        raise
+                    await stream.input_stream.send_audio_event(audio_chunk=chunk)
                 await stream.input_stream.end_stream()
 
         elif source == "browser":
             async def send_audio():
-                try:
-                    while True:
-                        audio_chunk = await websocket.receive_bytes()
-                        try:
-                            await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
-                        except Exception as e:
-                            logger.error(f"Error sending browser audio chunk")
-                            raise
-                except WebSocketDisconnect:
-                    logger.warning("WebSocket disconnected")
-                    await stream.input_stream.end_stream()
-                except Exception as e:
-                    logger.error(f"Browser audio stream error")
-                    raise
+                while True:
+                    audio_chunk = await websocket.receive_bytes()
+                    await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
 
         await asyncio.gather(send_audio(), handler.handle_events())
+
+    except WebSocketDisconnect:
+        logger.warning("WebSocket disconnected")
+        await stream.input_stream.end_stream()
+
     except Exception as e:
-        logger.exception(f"Unexpected error during transcription")
         handler.close_txt_output()
+        logger.exception(f"Unexpected error during transcription {e}")
 
 
-# # Event Startup
-# @app.on_event("startup")
-# async def startup_event():
-#     logger.info("Server started. Listening for requests...")
+async def aws_connection(client, retries=5, delay=5):
+    attempt = 0
+    while attempt < retries:
+        try:
+            stream = await client.start_stream_transcription(
+                language_code="id-ID",
+                media_sample_rate_hz=16000,
+                media_encoding="pcm",
+            )
+            logger.info(
+                f"Started transcription stream successfully on attempt {attempt + 1}")
+            return stream
 
+        except ServiceUnavailableException as e:
+            attempt += 1
+            logger.warning(
+                f"Service unavailable, retrying in {delay} seconds... Attempt {attempt}/{retries}")
+            await asyncio.sleep(delay)
 
-# # Event Shutdown
-# @app.on_event("shutdown")
-# async def shutdown_event():
-#     logger.warning("Server is shutting down...")
-#     logger.info("Cleaning up resources...")
-#     logger.info("Shutdown process complete.")
+        except (UnknownServiceException, BadRequestException,
+                LimitExceededException, InternalFailureException,
+                ConflictException, SerializationException) as e:
+            logger.error(f"Error starting transcription stream {e}")
+            raise
+
+    logger.error("Failed to start transcription after multiple attempts.")
+    return None
 
 
 # Root Endpoints (Testing)
@@ -216,7 +263,7 @@ def root():
     return {"message": "Hello, World!"}
 
 
-# Microphone Audio Inputs Endpoints
+# Microphone Audio Endpoints
 @app.websocket("/mic-transcribe")
 async def mic_transcription(websocket: WebSocket):
     await websocket.accept()
@@ -226,10 +273,10 @@ async def mic_transcription(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.warning("Client disconnected (microphone transcription)")
     except Exception as e:
-        logger.error(f"Unexpected error in mic transcription")
+        logger.error(f"Unexpected error in mic transcription {e}")
 
 
-# Browser Audio Inputs Endpoints
+# Browser Audio Endpoints
 @app.websocket("/aws-browser-transcribe")
 async def browser_transcription(websocket: WebSocket):
     await websocket.accept()
@@ -239,9 +286,15 @@ async def browser_transcription(websocket: WebSocket):
     except WebSocketDisconnect:
         logger.warning("Client disconnected (browser transcription)")
     except Exception as e:
-        logger.error(f"Unexpected error in browser transcription")
+        logger.error(f"Unexpected error in browser transcription {e}")
 
-# preview Endpoints
+
+# Summarizer Variable
+start_datetime = " "
+end_datetime = " "
+transcript = " "
+
+# Preview Endpoints
 
 
 @app.post("/preview")
@@ -268,7 +321,7 @@ async def preview_ws(
                     "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
                 }
                 # continue
-            transcripts = db_table.find({
+            transcripts = coll_data.find({
                 "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
             }, {"_id": 0, "transcript": 1})
             transcript_list = list(transcripts)
@@ -326,7 +379,7 @@ async def summarizer_websocket(websocket: WebSocket):
 
             try:
                 date = start_datetime.strftime('%d-%m-%Y')
-                transcripts = db_table.find({
+                transcripts = coll_data.find({
                     "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
                 }, {"_id": 0, "transcript": 1})
                 transcript_list = list(transcripts)
@@ -360,7 +413,7 @@ async def summarizer_websocket(websocket: WebSocket):
                     }
 
                     try:
-                        response = await client.post(summarizer_url, files=data)
+                        response = await client.post(summarizer_url, data=data)
                         response.raise_for_status()
 
                         result = response.json()
@@ -372,7 +425,7 @@ async def summarizer_websocket(websocket: WebSocket):
                             "timestamp": datetime.now().strftime('%d-%m-%Y'),
                             "summary": formatmd
                         }
-                        db_table1.insert_one(save)
+                        coll_summary.insert_one(save)
 
                         formathtml = summary.replace(
                             "\n", "<br>").replace("\t", "<br>")
@@ -434,15 +487,10 @@ async def summarizer_websocket(websocket: WebSocket):
             "message": "An unexpected error occurred."
         })
 
+
 if __name__ == "__main__":
     try:
         logger.info("Starting server...")
         uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True)
     except Exception as e:
-        logger.error(f"An unexpected error occurred")
-
-
-# MongoDB Installation
-# https://youtu.be/MyIiM7z_j_Y?si=uU7Hx9E5nOaf3eyG
-# MongoDB Tutorial
-# https://youtu.be/qWYx5neOh2s?si=ph4MEtIXQLa94DPf
+        logger.error(f"ERROR : \n {e}")
