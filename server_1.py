@@ -77,6 +77,8 @@ class AWSTranscription(TranscriptResultStreamHandler):
         self.txt_file = open(txt_path, "a", encoding="utf-8")
         logger.info("Txt output file has been created")
 
+        self.prev_output = ""
+
         # TIMER
         self.marked_timer = datetime.now()
         logger.info(f"Marked timer : {self.marked_timer.strftime('%H:%M')}")
@@ -90,7 +92,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
                         if self.ws:
                             await self.ws.send_text("listening")
                 else:
-                    if self.output != '':
+                    if self.output != '' and self.prev_output != self.output:
                         if self.ws:
                             time = datetime.now().strftime('%d-%m-%Y %H:%M')
                             await self.ws.send_json({
@@ -111,10 +113,13 @@ class AWSTranscription(TranscriptResultStreamHandler):
 
                         asyncio.create_task(self.handle_db_logging())
                         asyncio.create_task(self.handle_db_output())
+                        # await self.handle_db_logging()
+                        # await self.handle_db_output()
 
                         await self.handle_txt_output()
 
-                        self.output = ""
+                        # self.output = ""
+                        self.prev_output = self.output
 
         except ConnectionFailure as e:
             logger.error(f'Error saving data to mongoDB: {e}')
