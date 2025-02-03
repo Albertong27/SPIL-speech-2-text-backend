@@ -39,7 +39,7 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# MongoDB Atlas Configuration
+# MongoDB Configuration
 load_dotenv()
 
 client = MongoClient("", server_api=ServerApi('1'))         # MongoDB atlas     (cloud)
