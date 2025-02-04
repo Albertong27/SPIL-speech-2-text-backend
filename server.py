@@ -42,8 +42,10 @@ app.add_middleware(
 # MongoDB Configuration
 load_dotenv()
 
-# client = MongoClient("", server_api=ServerApi('1'))       # MongoDB atlas     (cloud)
-# MongoDB compass   (local)
+# MongoDB Atlas     (cloud)
+# client = MongoClient("", server_api=ServerApi('1'))   
+    
+# MongoDB Compass   (local)
 client = MongoClient("mongodb://localhost:27017/")
 
 db = client.spil
@@ -65,7 +67,6 @@ os.makedirs(os.path.dirname(txt_path), exist_ok=True)
 
 # ID Room Configuration
 id_room = 0
-
 
 # Transcription Object Class
 class AWSTranscription(TranscriptResultStreamHandler):
@@ -101,24 +102,24 @@ class AWSTranscription(TranscriptResultStreamHandler):
                             })
 
                             if datetime.now() >= (self.marked_timer + timedelta(hours=3, minutes=30)):
-                                logger.warning(
-                                    "3 hours timer is on. Refreshing...")
+                                logger.warning("3 hours timer is on. Refreshing...")
                                 self.marked_timer = datetime.now()
-                                logger.info(
-                                    f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
+                                logger.info(f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
                                 await self.ws.send_json({
                                     "status": "warning",
                                     "massage": "3 hours timer is on. Refreshing..."
                                 })
 
-                        asyncio.create_task(self.handle_db_logging())
-                        asyncio.create_task(self.handle_db_output())
+                        # Asynchronous
+                        asyncio.create_task(self.handle_db_logging(self.output))
+                        asyncio.create_task(self.handle_db_output(self.output))
+
+                        # Synchronous 
                         # await self.handle_db_logging()
                         # await self.handle_db_output()
 
                         await self.handle_txt_output()
 
-                        # self.output = ""
                         self.prev_output = self.output
 
         except ConnectionFailure as e:
@@ -138,24 +139,24 @@ class AWSTranscription(TranscriptResultStreamHandler):
             logger.warning(f"An error occurred: {e}")
             pass
 
-    async def handle_db_logging(self):
+    async def handle_db_logging(self, output):
         global id_room
 
         data = {
-            "raw_input": self.output,
+            "raw_input": output,
             "id_room": str(id_room)
         }
-        response = requests.post(self.url_log, data=data, timeout=10.0)
+        response = requests.post(self.url_log, data=data, timeout=30.0)
         response.raise_for_status()
 
-    async def handle_db_output(self):
+    async def handle_db_output(self, output):
         date = datetime.now().strftime('%d-%m-%Y')
         time = datetime.now().strftime('%H:%M')
 
         coll_data.insert_one({
             "date": date,
             "time": time,
-            "transcript": self.output
+            "transcript": output
         })
 
     async def handle_txt_output(self):
@@ -226,7 +227,7 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
         handler.close_txt_output()
         logger.exception(f"Unexpected error during transcription {e}")
 
-
+# AWS Connection
 async def aws_connection(client, retries=5, delay=5):
     attempt = 0
     while attempt < retries:
@@ -295,49 +296,40 @@ end_datetime = " "
 transcript = " "
 
 # Preview Endpoints
-
-
 @app.post("/preview")
-async def preview_ws(
-    start_datetime: str = Form(...),
-    end_datetime: str = Form(...)
-):
-    # await websocket.accept()
+async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(...)):
     try:
         if True:
-            # data = await websocket.receive_json()
-            # start_datetime = data.get("start_datetime")
-            # end_datetime = data.get("end_datetime")
             try:
                 start_datetime = datetime.strptime(
                     start_datetime, '%d-%m-%Y %H:%M')
                 end_datetime = datetime.strptime(
                     end_datetime, '%d-%m-%Y %H:%M')
                 date = start_datetime.strftime('%d-%m-%Y')
+
             except ValueError as e:
                 logger.error(f"Invalid datetime format: {e}")
                 return {
                     "status": "error",
                     "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
                 }
-                # continue
+            
             transcripts = coll_data.find({
                 "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
             }, {"_id": 0, "transcript": 1})
+
             transcript_list = list(transcripts)
 
             if not transcript_list:
-                logger.warning(
-                    f"No data found for time range {start_datetime} - {end_datetime}")
+                logger.warning(f"No data found for time range {start_datetime} - {end_datetime}")
+
                 return {
                     "status": "no_data",
                     "message": "No transcripts found within the provided time range."
                 }
-                # continue
 
-            # Gabungkan transkripsi menjadi satu teks
-            transcript = " ".join([doc["transcript"]
-                                  for doc in transcript_list])
+            transcript = " ".join([doc["transcript"]for doc in transcript_list])
+
             return {
                 "status": "success",
                 "transcript": transcript
@@ -346,23 +338,16 @@ async def preview_ws(
         pass
 
 # Summarizer Endpoints
-
-
 @app.websocket("/summarizer")
 async def summarizer_websocket(websocket: WebSocket):
     await websocket.accept()
     summarizer_url = "http://192.168.1.50:19110/api/sac/summarize"
     try:
         logger.info("Client connected to summarizer endpoint")
-
         while True:
-
             data = await websocket.receive_json()
             start_datetime = data.get("start_datetime")
             end_datetime = data.get("end_datetime")
-
-            # start_datetime = "01-02-2025 10:23"
-            # end_datetime = "01-02-2025 10:25"
 
             try:
                 start_datetime = datetime.strptime(
@@ -393,18 +378,11 @@ async def summarizer_websocket(websocket: WebSocket):
                     })
                     continue
 
-                # Gabungkan transkripsi menjadi satu teks
-                transcript = " ".join([doc["transcript"]
-                                      for doc in transcript_list])
-                # await websocket.send_json({
-                #     "status": "success",
-                #     "transcript": transcript
-                # })
+                transcript = " ".join([doc["transcript"] for doc in transcript_list])
 
-                prompt_indo = "Tolong buatlah kesimpulan dari kalimat ini menggunakan bahasa indonesia :"
+                prompt_indo = "Tolong buatlah kesimpulan dari kalimat ini menggunakan bahasa indonesia dengan struktur per poin : \n"
 
-                async with httpx.AsyncClient() as client:  # Transkrip tidak keluar coba tambahkan timeout=30.0
-                    # Format data API
+                async with httpx.AsyncClient() as client:
                     data = {
                         "raw_input": (None, prompt_indo + transcript),
                         "id_room": (None, "0"),
@@ -431,45 +409,47 @@ async def summarizer_websocket(websocket: WebSocket):
                             "\n", "<br>").replace("\t", "<br>")
                         htmlsummary = markdown.markdown(formathtml)
 
-                        # Kirim Transkrip
                         await websocket.send_json({
                             "status": "success",
                             "summary": htmlsummary
                         })
+
                     except httpx.HTTPStatusError as e:
-                        # Tangani error HTTP (misalnya, 422 Unprocessable Entity)
                         logger.error(f"Error sending data to summarizer: {e}")
-                        # Log response dari API
                         logger.error(f"Response content: {e.response.text}")
                         await websocket.send_json({
                             "status": "error",
                             "message": f"Summarizer API error: {e.response.text}"
                         })
+
                     except Exception as e:
-                        # Tangani error lainnya
                         logger.exception("Unexpected error in summarizer")
                         await websocket.send_json({
                             "status": "error",
                             "message": "An unexpected error occurred."
                         })
+
             except ValueError as ve:
                 logger.error(f"Error: {ve}")
                 await websocket.send_json({
                     "status": "error",
                     "message": str(ve)
                 })
+
             except ConnectionFailure as e:
                 logger.error(f'Error saving data to mongoDB: {e}')
                 await websocket.send_json({
                     "status": "error",
                     "message": str(e)
                 })
+
             except httpx.HTTPStatusError as e:
                 logger.error(f"Error sending data to summarizer: {e}")
                 await websocket.send_json({
                     "status": "error",
                     "message": str(e)
                 })
+
             except Exception as e:
                 logger.exception(
                     "Error querying MongoDB or summarizing transcript")
