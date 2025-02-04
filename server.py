@@ -93,7 +93,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
                         if self.ws:
                             await self.ws.send_text("listening")
                 else:
-                    if self.output != '' and self.prev_output != self.output:
+                    if self.output != "" and self.prev_output != self.output:
                         if self.ws:
                             time = datetime.now().strftime('%d-%m-%Y %H:%M')
                             await self.ws.send_json({
@@ -146,6 +146,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
             "raw_input": output,
             "id_room": str(id_room)
         }
+
         response = requests.post(self.url_log, data=data, timeout=30.0)
         response.raise_for_status()
 
@@ -218,6 +219,13 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
                     await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
 
         await asyncio.gather(send_audio(), handler.handle_events())
+    
+    except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
+            LimitExceededException, InternalFailureException,
+            ConflictException, SerializationException) as e:
+        logger.warning(f"Error starting transcription stream {e}")
+        logger.warning(f"Restrarting connection...")
+        await audio_transcription(websocket=WebSocket, source=source)
 
     except WebSocketDisconnect:
         logger.warning("WebSocket disconnected")
@@ -241,17 +249,13 @@ async def aws_connection(client, retries=5, delay=5):
                 f"Started transcription stream successfully on attempt {attempt + 1}")
             return stream
 
-        except ServiceUnavailableException as e:
-            attempt += 1
-            logger.warning(
-                f"Service unavailable, retrying in {delay} seconds... Attempt {attempt}/{retries}")
-            await asyncio.sleep(delay)
-
-        except (UnknownServiceException, BadRequestException,
+        except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
                 LimitExceededException, InternalFailureException,
                 ConflictException, SerializationException) as e:
-            logger.error(f"Error starting transcription stream {e}")
-            raise
+            attempt += 1
+            logger.warning(f"Error starting transcription stream {e}")
+            logger.warning("Retrying in {delay} seconds... Attempt {attempt}/{retries}")
+            await asyncio.sleep(delay)
 
     logger.error("Failed to start transcription after multiple attempts.")
     return None
@@ -334,6 +338,7 @@ async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(.
                 "status": "success",
                 "transcript": transcript
             }
+        
     except Exception as e:
         pass
 
