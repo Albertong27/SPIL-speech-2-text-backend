@@ -152,7 +152,7 @@ class AWSTranscription(TranscriptResultStreamHandler):
 
     async def handle_db_output(self, output):
         date = datetime.now().strftime('%d-%m-%Y')
-        time = datetime.now().strftime('%H:%M')
+        time = datetime.now().strftime('%H:%M:%S')
 
         coll_data.insert_one({
             "date": date,
@@ -225,7 +225,7 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
             ConflictException, SerializationException) as e:
         logger.warning(f"Error starting transcription stream {e}")
         logger.warning(f"Restrarting connection...")
-        await audio_transcription(websocket=WebSocket, source=source)
+        await websocket.send_json({"error": "Transcription connection error"})
 
     except WebSocketDisconnect:
         logger.warning("WebSocket disconnected")
