@@ -251,8 +251,9 @@ async def aws_connection(client):
             media_sample_rate_hz=16000,
             media_encoding="pcm",
         )
+
         logger.info(
-            f"Started transcription stream successfully on attempt {attempt + 1}")
+            f"Started transcription stream successfully")
         return stream
 
     except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
@@ -260,7 +261,7 @@ async def aws_connection(client):
             ConflictException, SerializationException) as e:
         logger.warning(f"Error starting transcription stream {e}")
         logger.warning(
-            "Retrying in {delay} seconds... Attempt {attempt}/{retries}")
+            "Retrying...")
         return None
 
 
