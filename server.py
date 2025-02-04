@@ -179,9 +179,10 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
 
     stream = await aws_connection(client)
 
-    if not stream:
-        await websocket.send_json({"error": "Failed to connect to Amazon Transcribe service after multiple attempts."})
-        return
+    while not stream:
+        await websocket.send_json({"error": "Failed to connect to Amazon Transcribe service. Reconnecting..."})
+        stream = await aws_connection(client)
+        await asyncio.sleep(5)
 
     handler = AWSTranscription(stream.output_stream, websocket)
 
@@ -236,29 +237,23 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
         logger.exception(f"Unexpected error during transcription {e}")
 
 # AWS Connection
-async def aws_connection(client, retries=5, delay=5):
-    attempt = 0
-    while attempt < retries:
-        try:
-            stream = await client.start_stream_transcription(
-                language_code="id-ID",
-                media_sample_rate_hz=16000,
-                media_encoding="pcm",
-            )
-            logger.info(
-                f"Started transcription stream successfully on attempt {attempt + 1}")
-            return stream
+async def aws_connection():
+    try:
+        stream = await client.start_stream_transcription(
+            language_code="id-ID",
+            media_sample_rate_hz=16000,
+            media_encoding="pcm",
+        )
+        logger.info(
+            f"Started transcription stream successfully on attempt {attempt + 1}")
+        return stream
 
-        except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
-                LimitExceededException, InternalFailureException,
-                ConflictException, SerializationException) as e:
-            attempt += 1
-            logger.warning(f"Error starting transcription stream {e}")
-            logger.warning("Retrying in {delay} seconds... Attempt {attempt}/{retries}")
-            await asyncio.sleep(delay)
-
-    logger.error("Failed to start transcription after multiple attempts.")
-    return None
+    except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
+            LimitExceededException, InternalFailureException,
+            ConflictException, SerializationException) as e:
+        logger.warning(f"Error starting transcription stream {e}")
+        logger.warning("Retrying in {delay} seconds... Attempt {attempt}/{retries}")
+        return None
 
 
 # Root Endpoints (Testing)
