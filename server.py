@@ -43,8 +43,8 @@ app.add_middleware(
 load_dotenv()
 
 # MongoDB Atlas     (cloud)
-# client = MongoClient("", server_api=ServerApi('1'))   
-    
+# client = MongoClient("", server_api=ServerApi('1'))
+
 # MongoDB Compass   (local)
 client = MongoClient("mongodb://localhost:27017/")
 
@@ -69,6 +69,8 @@ os.makedirs(os.path.dirname(txt_path), exist_ok=True)
 id_room = 0
 
 # Transcription Object Class
+
+
 class AWSTranscription(TranscriptResultStreamHandler):
     def __init__(self, stream, websocket: WebSocket):
         super().__init__(stream)
@@ -102,19 +104,22 @@ class AWSTranscription(TranscriptResultStreamHandler):
                             })
 
                             if datetime.now() >= (self.marked_timer + timedelta(hours=3, minutes=30)):
-                                logger.warning("3 hours timer is on. Refreshing...")
+                                logger.warning(
+                                    "3 hours timer is on. Refreshing...")
                                 self.marked_timer = datetime.now()
-                                logger.info(f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
+                                logger.info(
+                                    f"Marked timer updated : {self.marked_timer.strftime('%H:%M')}")
                                 await self.ws.send_json({
                                     "status": "warning",
                                     "massage": "3 hours timer is on. Refreshing..."
                                 })
 
                         # Asynchronous
-                        asyncio.create_task(self.handle_db_logging(self.output))
+                        asyncio.create_task(
+                            self.handle_db_logging(self.output))
                         asyncio.create_task(self.handle_db_output(self.output))
 
-                        # Synchronous 
+                        # Synchronous
                         # await self.handle_db_logging()
                         # await self.handle_db_output()
 
@@ -220,7 +225,7 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
                     await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
 
         await asyncio.gather(send_audio(), handler.handle_events())
-    
+
     except (ServiceUnavailableException, UnknownServiceException, BadRequestException,
             LimitExceededException, InternalFailureException,
             ConflictException, SerializationException) as e:
@@ -237,7 +242,9 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
         logger.exception(f"Unexpected error during transcription {e}")
 
 # AWS Connection
-async def aws_connection():
+
+
+async def aws_connection(client):
     try:
         stream = await client.start_stream_transcription(
             language_code="id-ID",
@@ -252,7 +259,8 @@ async def aws_connection():
             LimitExceededException, InternalFailureException,
             ConflictException, SerializationException) as e:
         logger.warning(f"Error starting transcription stream {e}")
-        logger.warning("Retrying in {delay} seconds... Attempt {attempt}/{retries}")
+        logger.warning(
+            "Retrying in {delay} seconds... Attempt {attempt}/{retries}")
         return None
 
 
@@ -295,6 +303,8 @@ end_datetime = " "
 transcript = " "
 
 # Preview Endpoints
+
+
 @app.post("/preview")
 async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(...)):
     try:
@@ -312,7 +322,7 @@ async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(.
                     "status": "error",
                     "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
                 }
-            
+
             transcripts = coll_data.find({
                 "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
             }, {"_id": 0, "transcript": 1})
@@ -320,24 +330,28 @@ async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(.
             transcript_list = list(transcripts)
 
             if not transcript_list:
-                logger.warning(f"No data found for time range {start_datetime} - {end_datetime}")
+                logger.warning(
+                    f"No data found for time range {start_datetime} - {end_datetime}")
 
                 return {
                     "status": "no_data",
                     "message": "No transcripts found within the provided time range."
                 }
 
-            transcript = " ".join([doc["transcript"]for doc in transcript_list])
+            transcript = " ".join([doc["transcript"]
+                                  for doc in transcript_list])
 
             return {
                 "status": "success",
                 "transcript": transcript
             }
-        
+
     except Exception as e:
         pass
 
 # Summarizer Endpoints
+
+
 @app.websocket("/summarizer")
 async def summarizer_websocket(websocket: WebSocket):
     await websocket.accept()
@@ -378,7 +392,8 @@ async def summarizer_websocket(websocket: WebSocket):
                     })
                     continue
 
-                transcript = " ".join([doc["transcript"] for doc in transcript_list])
+                transcript = " ".join([doc["transcript"]
+                                      for doc in transcript_list])
 
                 prompt_indo = "Tolong buatlah kesimpulan dari kalimat ini menggunakan bahasa indonesia dengan struktur per poin : \n"
 
