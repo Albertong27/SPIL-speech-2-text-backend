@@ -115,15 +115,15 @@ class AWSTranscription(TranscriptResultStreamHandler):
                                 })
 
                         # Asynchronous
-                        asyncio.create_task(
-                            self.handle_db_logging(self.output))
-                        asyncio.create_task(self.handle_db_output(self.output))
+                        # asyncio.create_task(
+                        #     self.handle_db_logging(self.output))
+                        # asyncio.create_task(self.handle_db_output(self.output))
 
                         # Synchronous
                         # await self.handle_db_logging()
                         # await self.handle_db_output()
 
-                        await self.handle_txt_output()
+                        # await self.handle_txt_output()
 
                         self.prev_output = self.output
 
@@ -306,182 +306,182 @@ transcript = " "
 # Preview Endpoints
 
 
-@app.post("/preview")
-async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(...)):
-    try:
-        if True:
-            try:
-                start_datetime = datetime.strptime(
-                    start_datetime, '%d-%m-%Y %H:%M')
-                end_datetime = datetime.strptime(
-                    end_datetime, '%d-%m-%Y %H:%M')
-                date = start_datetime.strftime('%d-%m-%Y')
+# @app.post("/preview")
+# async def preview_ws(start_datetime: str = Form(...), end_datetime: str = Form(...)):
+#     try:
+#         if True:
+#             try:
+#                 start_datetime = datetime.strptime(
+#                     start_datetime, '%d-%m-%Y %H:%M')
+#                 end_datetime = datetime.strptime(
+#                     end_datetime, '%d-%m-%Y %H:%M')
+#                 date = start_datetime.strftime('%d-%m-%Y')
 
-            except ValueError as e:
-                logger.error(f"Invalid datetime format: {e}")
-                return {
-                    "status": "error",
-                    "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
-                }
+#             except ValueError as e:
+#                 logger.error(f"Invalid datetime format: {e}")
+#                 return {
+#                     "status": "error",
+#                     "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
+#                 }
 
-            transcripts = coll_data.find({
-                "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
-            }, {"_id": 0, "transcript": 1})
+#             transcripts = coll_data.find({
+#                 "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
+#             }, {"_id": 0, "transcript": 1})
 
-            transcript_list = list(transcripts)
+#             transcript_list = list(transcripts)
 
-            if not transcript_list:
-                logger.warning(
-                    f"No data found for time range {start_datetime} - {end_datetime}")
+#             if not transcript_list:
+#                 logger.warning(
+#                     f"No data found for time range {start_datetime} - {end_datetime}")
 
-                return {
-                    "status": "no_data",
-                    "message": "No transcripts found within the provided time range."
-                }
+#                 return {
+#                     "status": "no_data",
+#                     "message": "No transcripts found within the provided time range."
+#                 }
 
-            transcript = " ".join([doc["transcript"]
-                                  for doc in transcript_list])
+#             transcript = " ".join([doc["transcript"]
+#                                   for doc in transcript_list])
 
-            return {
-                "status": "success",
-                "transcript": transcript
-            }
+#             return {
+#                 "status": "success",
+#                 "transcript": transcript
+#             }
 
-    except Exception as e:
-        pass
+#     except Exception as e:
+#         pass
 
 # Summarizer Endpoints
 
 
-@app.websocket("/summarizer")
-async def summarizer_websocket(websocket: WebSocket):
-    await websocket.accept()
-    summarizer_url = "http://192.168.1.50:19110/api/sac/summarize"
-    try:
-        logger.info("Client connected to summarizer endpoint")
-        while True:
-            data = await websocket.receive_json()
-            start_datetime = data.get("start_datetime")
-            end_datetime = data.get("end_datetime")
+# @app.websocket("/summarizer")
+# async def summarizer_websocket(websocket: WebSocket):
+#     await websocket.accept()
+#     summarizer_url = "http://192.168.1.50:19110/api/sac/summarize"
+#     try:
+#         logger.info("Client connected to summarizer endpoint")
+#         while True:
+#             data = await websocket.receive_json()
+#             start_datetime = data.get("start_datetime")
+#             end_datetime = data.get("end_datetime")
 
-            try:
-                start_datetime = datetime.strptime(
-                    start_datetime, '%d-%m-%Y %H:%M')
-                end_datetime = datetime.strptime(
-                    end_datetime, '%d-%m-%Y %H:%M')
-            except ValueError as e:
-                logger.error(f"Invalid datetime format: {e}")
-                await websocket.send_json({
-                    "status": "error",
-                    "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
-                })
-                continue
+#             try:
+#                 start_datetime = datetime.strptime(
+#                     start_datetime, '%d-%m-%Y %H:%M')
+#                 end_datetime = datetime.strptime(
+#                     end_datetime, '%d-%m-%Y %H:%M')
+#             except ValueError as e:
+#                 logger.error(f"Invalid datetime format: {e}")
+#                 await websocket.send_json({
+#                     "status": "error",
+#                     "message": "Invalid datetime format. Use 'DD-MM-YYYY HH:MM'."
+#                 })
+#                 continue
 
-            try:
-                date = start_datetime.strftime('%d-%m-%Y')
-                transcripts = coll_data.find({
-                    "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
-                }, {"_id": 0, "transcript": 1})
-                transcript_list = list(transcripts)
+#             try:
+#                 date = start_datetime.strftime('%d-%m-%Y')
+#                 transcripts = coll_data.find({
+#                     "date": date, "time": {"$gte": start_datetime.strftime('%H:%M:%S'), "$lte": end_datetime.strftime('%H:%M:%S')}
+#                 }, {"_id": 0, "transcript": 1})
+#                 transcript_list = list(transcripts)
 
-                if not transcript_list:
-                    logger.warning(
-                        f"No data found for time range {start_datetime} - {end_datetime}")
-                    await websocket.send_json({
-                        "status": "no_data",
-                        "message": "No transcripts found within the provided time range."
-                    })
-                    continue
+#                 if not transcript_list:
+#                     logger.warning(
+#                         f"No data found for time range {start_datetime} - {end_datetime}")
+#                     await websocket.send_json({
+#                         "status": "no_data",
+#                         "message": "No transcripts found within the provided time range."
+#                     })
+#                     continue
 
-                transcript = " ".join([doc["transcript"]
-                                      for doc in transcript_list])
+#                 transcript = " ".join([doc["transcript"]
+#                                       for doc in transcript_list])
 
-                prompt_indo = "Tolong buatlah kesimpulan dari kalimat ini menggunakan bahasa indonesia dengan struktur per poin : \n"
+#                 prompt_indo = "Tolong buatlah kesimpulan dari kalimat ini menggunakan bahasa indonesia dengan struktur per poin : \n"
 
-                async with httpx.AsyncClient() as client:
-                    data = {
-                        "raw_input": (None, prompt_indo + transcript),
-                        "id_room": (None, "0"),
-                        "raw_start": (None, start_datetime.strftime('%d-%m-%Y %H:%M')),
-                        "raw_end": (None, end_datetime.strftime('%d-%m-%Y %H:%M'))
-                    }
+#                 async with httpx.AsyncClient() as client:
+#                     data = {
+#                         "raw_input": (None, prompt_indo + transcript),
+#                         "id_room": (None, "0"),
+#                         "raw_start": (None, start_datetime.strftime('%d-%m-%Y %H:%M')),
+#                         "raw_end": (None, end_datetime.strftime('%d-%m-%Y %H:%M'))
+#                     }
 
-                    try:
-                        response = await client.post(summarizer_url, data=data)
-                        response.raise_for_status()
+#                     try:
+#                         response = await client.post(summarizer_url, data=data)
+#                         response.raise_for_status()
 
-                        result = response.json()
-                        summary = result.get('result', {}).get(
-                            'response', "Summary not found")
+#                         result = response.json()
+#                         summary = result.get('result', {}).get(
+#                             'response', "Summary not found")
 
-                        formatmd = summary.replace("\n", "").replace("\t", "")
-                        save = {
-                            "timestamp": datetime.now().strftime('%d-%m-%Y'),
-                            "summary": formatmd
-                        }
-                        coll_summary.insert_one(save)
+#                         formatmd = summary.replace("\n", "").replace("\t", "")
+#                         save = {
+#                             "timestamp": datetime.now().strftime('%d-%m-%Y'),
+#                             "summary": formatmd
+#                         }
+#                         coll_summary.insert_one(save)
 
-                        formathtml = summary.replace(
-                            "\n", "<br>").replace("\t", "<br>")
-                        htmlsummary = markdown.markdown(formathtml)
+#                         formathtml = summary.replace(
+#                             "\n", "<br>").replace("\t", "<br>")
+#                         htmlsummary = markdown.markdown(formathtml)
 
-                        await websocket.send_json({
-                            "status": "success",
-                            "summary": htmlsummary
-                        })
+#                         await websocket.send_json({
+#                             "status": "success",
+#                             "summary": htmlsummary
+#                         })
 
-                    except httpx.HTTPStatusError as e:
-                        logger.error(f"Error sending data to summarizer: {e}")
-                        logger.error(f"Response content: {e.response.text}")
-                        await websocket.send_json({
-                            "status": "error",
-                            "message": f"Summarizer API error: {e.response.text}"
-                        })
+#                     except httpx.HTTPStatusError as e:
+#                         logger.error(f"Error sending data to summarizer: {e}")
+#                         logger.error(f"Response content: {e.response.text}")
+#                         await websocket.send_json({
+#                             "status": "error",
+#                             "message": f"Summarizer API error: {e.response.text}"
+#                         })
 
-                    except Exception as e:
-                        logger.exception("Unexpected error in summarizer")
-                        await websocket.send_json({
-                            "status": "error",
-                            "message": "An unexpected error occurred."
-                        })
+#                     except Exception as e:
+#                         logger.exception("Unexpected error in summarizer")
+#                         await websocket.send_json({
+#                             "status": "error",
+#                             "message": "An unexpected error occurred."
+#                         })
 
-            except ValueError as ve:
-                logger.error(f"Error: {ve}")
-                await websocket.send_json({
-                    "status": "error",
-                    "message": str(ve)
-                })
+#             except ValueError as ve:
+#                 logger.error(f"Error: {ve}")
+#                 await websocket.send_json({
+#                     "status": "error",
+#                     "message": str(ve)
+#                 })
 
-            except ConnectionFailure as e:
-                logger.error(f'Error saving data to mongoDB: {e}')
-                await websocket.send_json({
-                    "status": "error",
-                    "message": str(e)
-                })
+#             except ConnectionFailure as e:
+#                 logger.error(f'Error saving data to mongoDB: {e}')
+#                 await websocket.send_json({
+#                     "status": "error",
+#                     "message": str(e)
+#                 })
 
-            except httpx.HTTPStatusError as e:
-                logger.error(f"Error sending data to summarizer: {e}")
-                await websocket.send_json({
-                    "status": "error",
-                    "message": str(e)
-                })
+#             except httpx.HTTPStatusError as e:
+#                 logger.error(f"Error sending data to summarizer: {e}")
+#                 await websocket.send_json({
+#                     "status": "error",
+#                     "message": str(e)
+#                 })
 
-            except Exception as e:
-                logger.exception(
-                    "Error querying MongoDB or summarizing transcript")
-                await websocket.send_json({
-                    "status": "error",
-                    "message": "Internal server error. Please try again later."
-                })
+#             except Exception as e:
+#                 logger.exception(
+#                     "Error querying MongoDB or summarizing transcript")
+#                 await websocket.send_json({
+#                     "status": "error",
+#                     "message": "Internal server error. Please try again later."
+#                 })
 
-    except WebSocketDisconnect:
-        logger.warning("Client disconnected from summarizer endpoint")
-    except Exception as e:
-        logger.error(f"Unexpected error in summarizer: {e}")
-        await websocket.send_json({
-            "status": "error",
-            "message": "An unexpected error occurred."
-        })
+#     except WebSocketDisconnect:
+#         logger.warning("Client disconnected from summarizer endpoint")
+#     except Exception as e:
+#         logger.error(f"Unexpected error in summarizer: {e}")
+#         await websocket.send_json({
+#             "status": "error",
+#             "message": "An unexpected error occurred."
+#         })
 
 
 if __name__ == "__main__":
