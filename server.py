@@ -1,18 +1,18 @@
 import os
-import httpx
+# import httpx
 import requests
 import asyncio
 import uvicorn
-import sounddevice
-import markdown
+# import sounddevice
+# import markdown
 from loguru import logger
-from bson import ObjectId
+# from bson import ObjectId
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymongo.server_api import ServerApi
+# from pymongo import MongoClient
+# from pymongo.server_api import ServerApi
 from fastapi import FastAPI, WebSocket, Form
-from pymongo.errors import ConnectionFailure
+# from pymongo.errors import ConnectionFailure
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.websockets import WebSocketDisconnect
 from amazon_transcribe.model import TranscriptEvent
@@ -46,11 +46,11 @@ load_dotenv()
 # client = MongoClient("", server_api=ServerApi('1'))
 
 # MongoDB Compass   (local)
-client = MongoClient("mongodb://localhost:27017/")
+# client = MongoClient("mongodb://localhost:27017/")
 
-db = client.spil
-coll_data = db.data
-coll_summary = db.summary
+# db = client.spil
+# coll_data = db.data
+# coll_summary = db.summary
 
 # Logging Configuration
 log_dir = "app/"
@@ -127,8 +127,8 @@ class AWSTranscription(TranscriptResultStreamHandler):
 
                         self.prev_output = self.output
 
-        except ConnectionFailure as e:
-            logger.error(f'Error saving data to mongoDB: {e}')
+        # except ConnectionFailure as e:
+        #     logger.error(f'Error saving data to mongoDB: {e}')
         except Exception as e:
             logger.exception(f"Error while handling transcript event {e}")
         except requests.exceptions.HTTPError as e:
@@ -159,11 +159,11 @@ class AWSTranscription(TranscriptResultStreamHandler):
         date = datetime.now().strftime('%d-%m-%Y')
         time = datetime.now().strftime('%H:%M:%S')
 
-        coll_data.insert_one({
-            "date": date,
-            "time": time,
-            "transcript": output
-        })
+        # coll_data.insert_one({
+        #     "date": date,
+        #     "time": time,
+        #     "transcript": output
+        # })
 
     async def handle_txt_output(self):
         try:
@@ -192,37 +192,37 @@ async def audio_transcription(websocket: WebSocket, source: str = "mic"):
     handler = AWSTranscription(stream.output_stream, websocket)
 
     try:
-        if source == "mic":
-            async def audio_source():
-                loop = asyncio.get_event_loop()
-                input_queue = asyncio.Queue()
+        # if source == "mic":
+        #     async def audio_source():
+        #         loop = asyncio.get_event_loop()
+        #         input_queue = asyncio.Queue()
 
-                def callback(indata, frame_count, time_info, status):
-                    loop.call_soon_threadsafe(
-                        input_queue.put_nowait, (bytes(indata), status))
+        #         def callback(indata, frame_count, time_info, status):
+        #             loop.call_soon_threadsafe(
+        #                 input_queue.put_nowait, (bytes(indata), status))
 
-                stream = sounddevice.RawInputStream(
-                    channels=1,
-                    samplerate=16000,
-                    callback=callback,
-                    blocksize=512,
-                    dtype="int16",
-                )
-                with stream:
-                    while True:
-                        indata, status = await input_queue.get()
-                        yield indata, status
+        #         stream = sounddevice.RawInputStream(
+        #             channels=1,
+        #             samplerate=16000,
+        #             callback=callback,
+        #             blocksize=512,
+        #             dtype="int16",
+        #         )
+        #         with stream:
+        #             while True:
+        #                 indata, status = await input_queue.get()
+        #                 yield indata, status
 
-            async def send_audio():
-                async for chunk, status in audio_source():
-                    await stream.input_stream.send_audio_event(audio_chunk=chunk)
-                await stream.input_stream.end_stream()
+        #     async def send_audio():
+        #         async for chunk, status in audio_source():
+        #             await stream.input_stream.send_audio_event(audio_chunk=chunk)
+        #         await stream.input_stream.end_stream()
 
-        elif source == "browser":
-            async def send_audio():
-                while True:
-                    audio_chunk = await websocket.receive_bytes()
-                    await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
+        # elif source == "browser":
+        async def send_audio():
+            while True:
+                audio_chunk = await websocket.receive_bytes()
+                await stream.input_stream.send_audio_event(audio_chunk=audio_chunk)
 
         await asyncio.gather(send_audio(), handler.handle_events())
 
