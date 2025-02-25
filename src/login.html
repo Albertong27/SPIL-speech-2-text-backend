@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+
+    <!-- tailwind -->
+    <link href="./input.css" rel="stylesheet" />
+    <link href="./output.css" rel="stylesheet" />
+
+    <!-- font poppins and roboto mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- font awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    />
+  </head>
+
+  <body
+    class="flex h-screen w-full flex-col items-center justify-center gap-10 font-poppins"
+    onload="logout('auto')"
+  >
+    <img
+      src="https://www.spil.co.id/img/spil_logo.581f4306.svg"
+      width="80"
+      alt="Logo"
+    />
+    <form id="userinfo" class="w-[300px] space-y-6">
+      <label class="form-control w-full max-w-xs">
+        <div class="label">
+          <span class="label-text">Username</span>
+        </div>
+        <input
+          required
+          name="username"
+          type="text"
+          placeholder="Enter your email"
+          class="input input-bordered w-full max-w-xs"
+          autocomplete="off"
+        />
+      </label>
+      <label class="form-control w-full max-w-xs">
+        <div class="label">
+          <span class="label-text">Password</span>
+        </div>
+        <input
+          required
+          name="password"
+          type="password"
+          placeholder="Enter your password"
+          class="input input-bordered w-full max-w-xs"
+          autocomplete="off"
+        />
+      </label>
+      <button
+        type="submit"
+        value="submit"
+        class="btn w-full !bg-[#16A34A] !text-white"
+      >
+        Login
+      </button>
+    </form>
+  </body>
+  <p class="absolute bottom-8 left-1/2 -translate-x-1/2 transform">
+    © PT SPIL 2025 V.0.1
+  </p>
+</html>
+
+<script src="together.js"></script>
+<script>
+  const API_BASE_URL = "http://192.168.1.50:19110/api";
+  const form = document.querySelector("#userinfo");
+
+  async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  async function sendData() {
+    // Associate the FormData object with the form element
+    const formData = new FormData(form);
+    const hashedPassword = await hashPassword(formData.get("password"));
+    formData.set("password", hashedPassword);
+    formData.append("is_encrypted", "1");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/transcribe/login`, {
+        method: "POST",
+        // Set the FormData instance as the request body
+        body: formData,
+      });
+
+      const res = await response.json();
+      if (res.status === "success") {
+        localStorage.setItem("result", res.result[0].USERNAME);
+        location.replace("dashboard.html");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Take over form submission
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendData();
+  });
+</script>

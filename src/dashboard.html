@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Page</title>
+
+    <!-- tailwind -->
+    <link href="./input.css" rel="stylesheet" />
+    <link href="./output.css" rel="stylesheet" />
+
+    <!-- font poppins and roboto mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- font awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    />
+  </head>
+
+  <body class="!space-y-6 p-10 font-poppins" onload="logout('auto')">
+    <section class="flex justify-between">
+      <button onclick="my_modal_3.showModal()" class="btn btn-primary">
+        New Recording
+      </button>
+      <div>
+        <p class="text-right" id="account"></p>
+        <button class="btn btn-ghost" onclick="logout('press')">
+          <i class="fas fa-sign-out"></i> Logout
+        </button>
+      </div>
+    </section>
+    <section>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <!-- head -->
+          <thead>
+            <tr>
+              <th></th>
+              <th>Meeting Name</th>
+              <th>Date</th>
+              <!-- Room Name -->
+              <!-- <th>ID</th>
+              <th>Is Enabled?</th> -->
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="table_meeting"></tbody>
+        </table>
+      </div>
+      <dialog id="my_modal_2" class="modal">
+        <div class="modal-box h-[90vh] w-[90%] max-w-none">
+          <form method="dialog">
+            <button
+              class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            >
+              ✕
+            </button>
+          </form>
+          <p id="summary"></p>
+        </div>
+      </dialog>
+      <dialog id="my_modal_1" class="modal">
+        <div class="modal-box w-[90%] max-w-none">
+          <form method="dialog">
+            <button
+              class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            >
+              ✕
+            </button>
+          </form>
+          <p class="text-lg font-semibold">Summary List</p>
+          <br />
+          <div class="overflow-x-auto">
+            <table class="table">
+              <!-- head -->
+              <thead>
+                <tr>
+                  <!-- <th>ID</th>
+                  <th>ID Room</th> -->
+                  <th>Start Time</th>
+                  <th>End Time</th>
+                  <th>Date</th>
+                  <th>Created By</th>
+                </tr>
+              </thead>
+              <tbody id="table_summary"></tbody>
+            </table>
+          </div>
+        </div>
+      </dialog>
+      <dialog id="my_modal_3" class="modal">
+        <div class="modal-box w-4/12 max-w-none">
+          <form method="dialog">
+            <button
+              class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            >
+              ✕
+            </button>
+          </form>
+          <form
+            id="usercreatemeeting"
+            class="flex flex-col items-center justify-center gap-8"
+          >
+            <div class="w-full space-y-4">
+              <label class="form-control">
+                <input
+                  required
+                  name="meeting_name"
+                  type="text"
+                  placeholder="Enter meeting name"
+                  class="input input-bordered"
+                  autocomplete="off"
+                />
+              </label>
+              <label class="form-control">
+                <textarea
+                  required
+                  name="meeting_topic"
+                  class="textarea textarea-bordered h-48"
+                  placeholder="Enter meeting topic"
+                  autocomplete="off"
+                ></textarea>
+              </label>
+            </div>
+            <button
+              id="createMeeting"
+              type="submit"
+              value="submit"
+              class="btn btn-neutral w-full"
+            >
+              Submit
+            </button>
+          </form>
+        </div>
+      </dialog>
+    </section>
+  </body>
+</html>
+<script src="together.js"></script>
+<script>
+  const API_BASE_URL = "http://192.168.1.50:19110/api";
+
+  const form = document.querySelector("#usercreatemeeting");
+  const createMeetingButtonDiv = document.getElementById("createMeeting");
+  const loadingSpinner = `<span class="loading loading-spinner loading-md"></span>`;
+
+  function resetSummarizeButton() {
+    summarizeButtonDiv.innerHTML = "Submit";
+    createMeetingButtonDiv.classList.remove("btn-disabled");
+  }
+
+  async function sendData() {
+    // Associate the FormData object with the form element
+    const formData = new FormData(form);
+    createMeetingButtonDiv.classList.add("btn-disabled");
+    createMeetingButtonDiv.innerHTML = loadingSpinner;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/transcribe/meeting/${username}/create`,
+        {
+          method: "POST",
+          // Set the FormData instance as the request body
+          body: formData,
+        },
+      );
+
+      const res = await response.json();
+      if (res.status === "success") {
+        ["meeting_name", "meeting_topic"].forEach((key) => {
+          localStorage.setItem(
+            key === "meeting_name" ? "meetingName" : "meetingTopic",
+            formData.get(key),
+          );
+        });
+        localStorage.setItem("id", res.result.id);
+        location.replace("client.html");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Take over form submission
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    sendData();
+  });
+
+  async function fetchData(endpoint) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/transcribe/${endpoint}`);
+      const data = await response.json();
+      return data.result || [];
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      return [];
+    }
+  }
+
+  async function renderTableMeeting() {
+    const data = await fetchData(`meeting/${username}`);
+    const tableMeeting = document.getElementById("table_meeting");
+    if (!data.length) return;
+
+    tableMeeting.innerHTML = data
+      .map(
+        (item, index) => `
+    <tr>
+      <th>${index + 1}</th>
+      <td>${item.ROOM_NAME}</td>
+      <td>${item.CREATED_ON}</td>
+      <td class="flex justify-end">
+        <button class="btn !bg-[#16A34A] !text-white" onclick="renderTableSummary('${username}', '${item.ID}'); my_modal_1.showModal();">
+          Summary
+        </button>
+      </td>
+    </tr>
+  `,
+      )
+      .join("");
+  }
+
+  async function renderTableSummary(createdBy, meetingId) {
+    const data = await fetchData(`summary/${meetingId}`);
+    const tableSummary = document.getElementById("table_summary");
+    tableSummary.innerHTML = "";
+    if (!data.length) return;
+
+    tableSummary.innerHTML = data
+      .filter((item) => item.CREATED_BY === createdBy)
+      .map(
+        (item) => `
+      <tr>
+        <td>${item.RAW_START_TIME}</td>
+        <td>${item.RAW_END_TIME}</td>
+        <td>${item.CREATED_ON}</td>
+        <td>${item.CREATED_BY}</td>
+        <td class="flex justify-end">
+          <button class="btn btn-square !bg-[#16A34A] !text-white" onclick="renderSummary('${item.ID}', '${meetingId}'); my_modal_2.showModal();">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </td>
+      </tr>
+    `,
+      )
+      .join("");
+  }
+
+  async function renderSummary(id, meetingId) {
+    const summaryElement = document.getElementById("summary");
+    const data = await fetchData(`summary/${meetingId}/${id}`);
+    console.log(meetingId);
+    if (!data.length) return;
+
+    summaryElement.innerHTML = "";
+    summaryElement.innerHTML = data[0].SUMMARIZED_OUTPUT;
+  }
+
+  // Initialize table rendering
+  renderTableMeeting();
+</script>
