@@ -120,6 +120,7 @@ io.of("aws-browser-transcribe").on("connection", (socket) => {
                     socket.emit("transcription", {
                       text: newPart,
                       isFinal: false,
+                      status: "listening",
                     });
                   }
                 }
