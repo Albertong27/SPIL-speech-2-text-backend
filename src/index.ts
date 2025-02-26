@@ -9,7 +9,6 @@ import {
   StartStreamTranscriptionCommand,
 } from "@aws-sdk/client-transcribe-streaming";
 import { Server } from "socket.io";
-import { timeStamp } from "console";
 
 /*
  * Load up and parse configuration details from
@@ -24,23 +23,36 @@ dotenv.config();
  * from the `process.env`
  */
 const app: Express = express();
-const server = http.createServer(app);
-const io = new Server(server);
 app.use(cors({ origin: "*" }));
 
-app.use(express.static(path.join(__dirname)));
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+// Set EJS as the view engine
+app.set("view engine", "ejs");
+
+// Define the directory where your HTML files (views) are located
+app.set("views", path.join(__dirname, "fe"));
+
+// Optionally, you can define a static files directory (CSS, JS, images, etc.)
+app.use(express.static(path.join(__dirname, "fe")));
 
 /* Define a route for the root path ("/")
  using the HTTP GET method */
 app.get("/", (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, "login.html"));
+  res.send("Express + Typescript Server");
 });
 
 const transcribeClient = new TranscribeStreamingClient({
   region: "us-east-1", // Ensure this matches your AWS region
 });
 
-io.on("connection", (socket) => {
+io.of("aws-browser-transcribe").on("connection", (socket) => {
   console.log("A user connected");
 
   let audioStream;
@@ -69,7 +81,7 @@ io.on("connection", (socket) => {
     };
 
     const command = new StartStreamTranscriptionCommand({
-      LanguageCode: "en-US",
+      LanguageCode: "id-ID",
       MediaSampleRateHertz: 44100,
       MediaEncoding: "pcm",
       AudioStream: audioStream(),
@@ -99,7 +111,6 @@ io.on("connection", (socket) => {
                   socket.emit("transcription", {
                     text: transcript,
                     isFinal: true,
-                    timeStamp: new Date(),
                   });
                   lastTranscript = transcript;
                 } else {
@@ -146,7 +157,7 @@ io.on("connection", (socket) => {
   });
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8000;
 /* Start the Express app and listen
  for incoming requests on the specified port */
 server.listen(port, () => {

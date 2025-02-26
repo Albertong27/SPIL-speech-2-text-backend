@@ -409,7 +409,8 @@
   }
 
   function resetWebSocket() {
-    if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+    // if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+    if (ws && ws.connected) ws.disconnect();
     ws = null;
   }
 
@@ -432,51 +433,59 @@
   function initWebSocket() {
     if (!ws) {
       // ws = new WebSocket("ws://localhost:8000/aws-browser-transcribe");
-      const ws = io();
-      ws.onmessage("transcription", (data) => {
-        const { text } = data;
+      ws = io("http://localhost:8000/aws-browser-transcribe");
+      ws.on("transcription", async (data) => {
+        console.log(data);
         const isListening = data === "listening";
         const timestamp = new Date().toString().split(" GMT")[0];
         interimDiv.innerHTML = isListening
           ? `<span class="loading loading-dots loading-md text-gray-500"></span>`
           : "";
-        if (!isListening) {
-          const transcriptChar = JSON.parse(data);
-          if (transcriptChar.transcription) {
-            raw_input += `${transcriptChar.transcription} `;
-            finalDiv.innerHTML += `
+        // if (!isListening) {
+        // const transcriptChar = JSON.parse(data);
+        if (data.isFinal) {
+          raw_input += `${data.text} `;
+          finalDiv.innerHTML += `
             <p>
-              <span>${transcriptChar.transcription}</span><br /><span
+              <span>${data.text}</span><br /><span
                 class="text-xs text-gray-500"
                 >${timestamp}</span
               >
             </p>
             <br />
             `;
-            handleLog(transcriptChar.transcription);
-          }
-          // if (transcriptChar.status === "warning") {
-          //   await startAndStopListening("stop");
-          //   await delay(5000);
-          //   await startAndStopListening("start");
-          // }
+          handleLog(data.text);
         }
+        // if (transcriptChar.status === "warning") {
+        //   await startAndStopListening("stop");
+        //   await delay(5000);
+        //   await startAndStopListening("start");
+        // }
+        // }
         scrollToBottom();
       });
     }
 
-    ws.onerror = () =>
-      handleWebSocketCloseOrError(
-        "alert-error text-white",
-        onErrorDiv,
-        "listen",
-      );
-    ws.onclose = () =>
+    // ws.onerror = () =>
+    //   handleWebSocketCloseOrError(
+    //     "alert-error text-white",
+    //     onErrorDiv,
+    //     "listen",
+    //   );
+    // ws.onclose = () =>
+    //   handleWebSocketCloseOrError(
+    //     "alert-warning text-black",
+    //     onCloseDiv,
+    //     "listen",
+    //   );
+
+    ws.on("disconnect", () =>
       handleWebSocketCloseOrError(
         "alert-warning text-black",
         onCloseDiv,
         "listen",
-      );
+      ),
+    );
   }
 
   async function initAudio() {
@@ -508,20 +517,26 @@
         while (audioContext === null) {
           await initAudio();
         }
-        const source = audioContext.createMediaStreamSource(micStream);
-        micProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-        source.connect(micProcessor);
-        micProcessor.connect(audioContext.destination);
+        audioContext = new AudioContext();
+        audioInput = audioContext.createMediaStreamSource(micStream);
+        processor = audioContext.createScriptProcessor(1024, 1, 1);
+        audioInput.connect(processor);
+        processor.connect(audioContext.destination);
 
-        micProcessor.onaudioprocess = (e) => {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            const inputData = e.inputBuffer.getChannelData(0);
-            const samples = new Int16Array(inputData.length);
-            for (let i = 0; i < inputData.length; i++) {
-              samples[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7fff;
-            }
-            ws.send(samples.buffer);
+        processor.onaudioprocess = (e) => {
+          const float32Array = e.inputBuffer.getChannelData(0);
+          const int16Array = new Int16Array(float32Array.length);
+          for (let i = 0; i < float32Array.length; i++) {
+            int16Array[i] = Math.max(
+              -32768,
+              Math.min(32767, Math.floor(float32Array[i] * 32768)),
+            );
           }
+          console.log(
+            "Sending audio chunk to server, size:",
+            int16Array.buffer.byteLength,
+          );
+          ws.emit("audioData", int16Array.buffer);
         };
       } catch (error) {
         console.error(error);
