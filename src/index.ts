@@ -33,15 +33,6 @@ const io = new Server(server, {
   },
 });
 
-// Set EJS as the view engine
-app.set("view engine", "ejs");
-
-// Define the directory where your HTML files (views) are located
-app.set("views", path.join(__dirname, "fe"));
-
-// Optionally, you can define a static files directory (CSS, JS, images, etc.)
-app.use(express.static(path.join(__dirname, "fe")));
-
 /* Define a route for the root path ("/")
  using the HTTP GET method */
 app.get("/", (req: Request, res: Response) => {
