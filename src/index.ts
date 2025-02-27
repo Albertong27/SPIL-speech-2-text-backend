@@ -2,7 +2,7 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import http from "http";
-import path from "path";
+// import path from "path";
 import cors from "cors";
 import {
   TranscribeStreamingClient,
