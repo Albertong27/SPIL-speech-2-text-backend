@@ -149,7 +149,7 @@ io.of("aws-browser-transcribe").on("connection", (socket) => {
   });
 });
 
-const port = process.env.PORT || 8000;
+const port = process.env.PORT || 16110;
 /* Start the Express app and listen
  for incoming requests on the specified port */
 server.listen(port, () => {
