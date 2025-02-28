@@ -2,7 +2,7 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import http from "http";
-// import path from "path";
+import path from "path";
 import cors from "cors";
 import {
   TranscribeStreamingClient,
@@ -33,10 +33,17 @@ const io = new Server(server, {
   },
 });
 
+app.use(express.static(path.join(__dirname, "")));
+
 /* Define a route for the root path ("/")
  using the HTTP GET method */
 app.get("/", (req: Request, res: Response) => {
   res.send("Express + Typescript Server");
+});
+
+app.get("/test", (req, res) => {
+  // Send the HTML file as the response
+  res.sendFile(path.join(__dirname, "client.html"));
 });
 
 const transcribeClient = new TranscribeStreamingClient({

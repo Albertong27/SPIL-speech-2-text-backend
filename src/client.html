@@ -1,0 +1,670 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speech to Text</title>
+    <script
+      src="https://cdn.socket.io/3.1.3/socket.io.min.js"
+      integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- tailwind -->
+    <link href="./input.css" rel="stylesheet" />
+    <link href="./output.css" rel="stylesheet" />
+
+    <!-- font poppins and roboto mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- font awesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"
+    />
+  </head>
+
+  <body class="font-poppins" onload="logout('auto')">
+    <section class="flex">
+      <!-- left side -->
+      <div class="flex h-screen w-[35%] flex-col shadow-lg">
+        <div class="w-full">
+          <!-- information bar -->
+          <div class="h-[15vh]">
+            <div
+              class="z-50 flex h-[15vh] w-full items-center justify-between px-8"
+            >
+              <button
+                onclick="my_modal_3.showModal()"
+                class="btn btn-circle btn-outline btn-neutral btn-sm"
+              >
+                <i class="fa-solid fa-circle-info"></i>
+              </button>
+              <div class="flex flex-col items-end">
+                <p id="account"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- transcription result -->
+          <div class="h-[70vh] !overflow-auto">
+            <div class="relative flex h-full flex-col justify-end">
+              <div class="space-y-6 overflow-auto px-8" id="transcription">
+                <div id="getDate"></div>
+                <p>
+                  <span class="text-sm" id="final"></span>
+                  <span class="text-sm text-gray-300" id="interim"></span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="fixed bottom-0 h-[15vh] w-[35%]">
+            <div class="flex h-[15vh] items-center justify-between px-8">
+              <!-- start record -->
+              <button
+                class="btn btn-primary w-fit flex-none"
+                id="startListening"
+                onclick="startAndStopListening('start')"
+              >
+                <i
+                  class="fa-solid fa-microphone fa-sm"
+                  style="color: #ffffff"
+                ></i>
+                Start Listening
+              </button>
+
+              <div class="flex items-center gap-2">
+                <!-- pause record -->
+                <button
+                  class="btn !btn-disabled btn-info hidden !text-white"
+                  id="stopListening"
+                  onclick="startAndStopListening('stop')"
+                >
+                  <i class="fa-solid fa-pause fa-sm" style="color: #ffffff"></i>
+                  Pause
+                </button>
+
+                <!-- <p class="hidden" id="countdown">3:30:00</p> -->
+              </div>
+
+              <div class="space-x-2">
+                <button
+                  id="endmeeting"
+                  class="btn btn-error min-w-[140px] !text-white"
+                  onclick="my_modal_1.showModal()"
+                >
+                  <i class="fa-solid fa-arrow-left"></i>
+                  End Meeting
+                </button>
+                <button
+                  class="btn btn-circle btn-outline btn-sm"
+                  onclick="scrollToBottom()"
+                >
+                  <i class="fa-solid fa-angles-down"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right side -->
+      <div class="mx-auto flex w-[65%]" id="rideSide">
+        <!-- time picker -->
+        <div class="w-full">
+          <div class="flex w-1/2 justify-between p-6 pr-0" id="formheight">
+            <div class="flex gap-2">
+              <input
+                type="time"
+                id="time_1"
+                class="block w-fit rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm leading-none text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                required
+              />
+              <input
+                type="time"
+                id="time_2"
+                class="block w-fit rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm leading-none text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-500"
+                onchange="preview('')"
+                required
+              />
+            </div>
+            <button class="btn btn-neutral" onclick="preview('')">
+              Preview Data
+            </button>
+          </div>
+
+          <!-- preview area -->
+          <div class="flex gap-4">
+            <div
+              class="ml-6 h-[calc(100vh-192px)] w-1/2 overflow-auto rounded-2xl p-6 shadow-lg"
+            >
+              <p class="text-gray-500" id="preview">
+                <span class="text-xl font-semibold">Transcription</span> <br />
+                Transcription will appear here
+              </p>
+            </div>
+            <!-- summary area -->
+            <div
+              class="mr-6 h-[calc(100vh-192px)] w-1/2 overflow-auto rounded-2xl p-6 shadow-lg"
+            >
+              <p class="text-gray-500" id="summary">
+                <span class="text-xl font-semibold">Summary</span> <br />
+                Summary will appear here
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-center p-6">
+            <button
+              class="btn h-full min-w-[188px] !bg-[#16A34A] !text-white"
+              type="submit"
+              id="summarizeButton"
+              onclick="preview('mintaPreview')"
+            >
+              <i
+                class="fa-solid fa-wand-magic-sparkles fa-sm !fill-neutral"
+              ></i>
+              Generate Summary
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- stop listening modal -->
+      <dialog id="my_modal_1" class="modal">
+        <div class="modal-box">
+          <p class="py-4">Are you sure you want to "End Meeting"?</p>
+          <div class="modal-action">
+            <form method="dialog" class="space-x-1">
+              <button
+                class="btn btn-outline btn-error btn-sm hover:!text-white"
+                onclick="startAndStopListening('end')"
+              >
+                Yes
+              </button>
+              <button class="btn btn-outline btn-sm">Cancel</button>
+            </form>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="my_modal_3" class="modal">
+        <div class="modal-box">
+          <form method="dialog">
+            <button
+              class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2"
+            >
+              ✕
+            </button>
+          </form>
+          <div id="information"></div>
+        </div>
+      </dialog>
+    </section>
+
+    <!-- alert -->
+    <div class="hidden" id="alert">
+      <div class="hidden" id="onerror">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>The program is error. Please contact administrator.</span>
+      </div>
+      <div class="hidden" id="onclose">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>The WebSocket connection is closed. Please start again.</span>
+      </div>
+    </div>
+  </body>
+</html>
+
+<script src="together.js"></script>
+<script>
+  const finalDiv = document.getElementById("final");
+  const getDateDiv = document.getElementById("getDate");
+  const interimDiv = document.getElementById("interim");
+  const loadingDiv = `<span class="loading loading-spinner loading-md"></span>`;
+  const onAlertDiv = document.getElementById("alert");
+  const onCloseDiv = document.getElementById("onclose");
+  const onErrorDiv = document.getElementById("onerror");
+  // const pauseListening = document.getElementById("pauseListening");
+  const previewDiv = document.getElementById("preview");
+  const startListening = document.getElementById("startListening");
+  const stopListening = document.getElementById("stopListening");
+  const summarizeButtonDiv = document.getElementById("summarizeButton");
+  const summaryDiv = document.getElementById("summary");
+  const transcriptionDiv = document.getElementById("transcription");
+  let audioContext = null;
+  let isAlreadyStart = false;
+  let micProcessor = null;
+  let micStream = null;
+  let mintaPreview = "";
+  let ws = null;
+  let raw_input = "";
+  const today = new Date().toLocaleDateString("id-ID").replace(/\//g, "-");
+  const endMeetingDiv = document.getElementById("endmeeting");
+  const loadingSpinner = `<span class="loading loading-spinner loading-md"></span>`;
+
+  function information() {
+    const informationDiv = document.getElementById("information");
+    informationDiv.innerHTML = `
+      <h3 class="text-lg font-bold">${localStorage.getItem("meetingName")}</h3>
+      <p class="py-4">${localStorage.getItem("meetingTopic")}</p>
+    `;
+  }
+
+  information();
+
+  // let countdownTime = 3 * 3600 + 30 * 60;
+
+  // function formatTime(seconds) {
+  //   const hrs = Math.floor(seconds / 3600);
+  //   const mins = Math.floor((seconds % 3600) / 60);
+  //   const secs = seconds % 60;
+
+  //   return `${hrs.toString().padStart(1, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  // }
+
+  // const countdownElement = document.getElementById("countdown");
+  // const timer = setInterval(() => {
+  //   if (countdownTime <= 0) {
+  //     clearInterval(timer);
+  //   } else {
+  //     countdownElement.textContent = formatTime(countdownTime);
+  //     countdownTime--;
+  //   }
+  // }, 1000);
+
+  async function preview(mintaPreview) {
+    if (mintaPreview !== "mintaPreview") {
+      previewDiv.innerHTML = loadingDiv;
+    }
+    const start_datetime = `${today} ${document.getElementById("time_1").value}`;
+    const end_datetime = `${today} ${document.getElementById("time_2").value}`;
+    try {
+      let formData = new FormData();
+      formData.append("start_date", start_datetime);
+      formData.append("end_date", end_datetime);
+      const response = await fetch(
+        `http://192.168.1.50:19110/api/transcribe/log/${username}/${id}/filter`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      const result = await response.json();
+      if (mintaPreview === "mintaPreview")
+        await handleSummarize(start_datetime, end_datetime);
+      else {
+        previewDiv.textContent = result.result
+          .map((item) => item.TEXT)
+          .join(" ");
+        previewDiv.classList = "text-black text-sm";
+      }
+    } catch (error) {
+      console.error(error);
+      previewDiv.innerHTML = `
+        <p class="text-gray-400" id="preview">
+          Transcription summary with selected time will appear here
+        </p>
+        `;
+      onAlertDiv.className = "toast";
+      onErrorDiv.className =
+        "alert alert-error text-white flex gap-2 fill-white text-sm";
+      setTimeout(() => {
+        onAlertDiv.className = "hidden";
+        onErrorDiv.className = "hidden";
+      }, 5000);
+    }
+  }
+
+  function scrollToBottom() {
+    transcriptionDiv.scrollTop = transcriptionDiv.scrollHeight;
+  }
+
+  const handleWebSocketCloseOrError = async (
+    messageClass,
+    alertClass,
+    type,
+  ) => {
+    interimDiv.innerHTML = "";
+    onAlertDiv.className = "toast";
+    alertClass.className = `alert ${messageClass} flex gap-2 fill-white text-sm`;
+
+    setTimeout(() => {
+      alertClass.className = "hidden";
+      onAlertDiv.className = "hidden";
+    }, 5000);
+
+    if (type === "listen") {
+      await cleanupAudioResources();
+      handleStop();
+      resetWebSocket();
+    } else if (type === "summary") {
+      previewDiv.innerHTML = `
+        <p class="text-gray-400" id="preview">
+          Transcription summary with selected time will appear here
+        </p>
+        `;
+      summaryDiv.innerHTML = `
+        <p class="text-gray-400" id="summary">
+          Transcription summary with selected time will appear here
+        </p>
+        `;
+      resetSummarizeButton();
+    }
+  };
+
+  function resetSummarizeButton() {
+    summarizeButtonDiv.innerHTML = `
+    <i class="fa-solid fa-wand-magic-sparkles fa-sm !fill-neutral"></i>Generate Summary`;
+    summarizeButtonDiv.classList.remove("!btn-disabled");
+  }
+
+  // function summarize(slug) {
+  // const loadingSpinner = `<span class="loading loading-spinner loading-md"></span>`;
+  // summaryDiv.innerHTML = loadingSpinner;
+  // summarizeButtonDiv.classList.add("btn-disabled");
+  // summarizeButtonDiv.innerHTML = loadingSpinner;
+  //   const socket = new WebSocket(`ws://localhost:8000${slug}`);
+
+  //   socket.onopen = () => {
+  //     const formatDate = (id) =>
+  //       `${new Date().toLocaleDateString("id-ID").replace(/\//g, "-")} ${document.getElementById(id).value}`;
+  //     socket.send(
+  //       JSON.stringify({
+  //         start_datetime: formatDate("time_1"),
+  //         end_datetime: formatDate("time_2"),
+  //       }),
+  //     );
+  //   };
+
+  //   socket.onmessage = ({ data }) => {
+  //     const response = JSON.parse(data);
+  //     summaryDiv.innerHTML = response.summary;
+  //     summaryDiv.classList = "text-black";
+  //     resetSummarizeButton();
+  //   };
+
+  //   socket.onerror = () =>
+  //     handleWebSocketCloseOrError(
+  //       "alert-error text-white",
+  //       onErrorDiv,
+  //       "summary",
+  //     );
+  //   socket.onclose = () =>
+  //     handleWebSocketCloseOrError(
+  //       "alert-warning text-black",
+  //       onCloseDiv,
+  //       "summary",
+  //     );
+  // }
+
+  async function cleanupAudioResources() {
+    micProcessor?.disconnect();
+    micStream?.getTracks().forEach((track) => track.stop());
+    await audioContext?.close();
+    micProcessor = micStream = audioContext = null;
+  }
+
+  function handleStop() {
+    // countdownElement.classList.add("hidden");
+    // countdownTime = 3 * 3600 + 30 * 60;
+    startListening.classList.remove("hidden");
+    startListening.innerHTML = `
+      <i class="fa-solid fa-microphone fa-sm" style="color: #ffffff"></i> Start
+      Listening
+      `;
+    stopListening.classList.add("hidden");
+    // pauseListening.classList.add("hidden");
+  }
+
+  async function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function initWebSocket() {
+    if (!ws) {
+      ws = io("http://localhost:16110/aws-browser-transcribe");
+
+      ws.on("transcription", (data) => {
+        console.log(data);
+        const isListening = data.status === "listening";
+        const timestamp = new Date().toString().split(" GMT")[0];
+        interimDiv.innerHTML = isListening
+          ? `<span class="loading loading-dots loading-md text-gray-500"></span>`
+          : "";
+        // if (!isListening) {
+        // const transcriptChar = JSON.parse(data);
+        if (data.isFinal) {
+          raw_input += `${data.text} `;
+          finalDiv.innerHTML += `
+            <p>
+              <span>${data.text}</span><br /><span
+                class="text-xs text-gray-500"
+                >${timestamp}</span
+              >
+            </p>
+            <br />
+            `;
+          handleLog(data.text);
+        }
+        // if (transcriptChar.status === "warning") {
+        //   await startAndStopListening("stop");
+        //   await delay(5000);
+        //   await startAndStopListening("start");
+        // }
+        // }
+        scrollToBottom();
+      });
+      // ws.onerror = () =>
+      //   handleWebSocketCloseOrError(
+      //     "alert-error text-white",
+      //     onErrorDiv,
+      //     "listen",
+      //   );
+      // ws.onclose = () =>
+      //   handleWebSocketCloseOrError(
+      //     "alert-warning text-black",
+      //     onCloseDiv,
+      //     "listen",
+      //   );
+
+      ws.on("error", (errorMessage) => {
+        console.error("Server error:", errorMessage);
+        handleWebSocketCloseOrError(
+          "alert-error text-white",
+          onErrorDiv,
+          "listen",
+        );
+      });
+
+      ws.on("disconnect", (data) => {
+        handleWebSocketCloseOrError(
+          "alert-error text-white",
+          onErrorDiv,
+          "listen",
+        );
+      });
+
+      ws.on("connect_error", (error) => {
+        handleWebSocketCloseOrError(
+          "alert-error text-white",
+          onErrorDiv,
+          "listen",
+        );
+      });
+    }
+  }
+
+  function resetWebSocket() {
+    // if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+    // ws.emit("stopTranscription");
+    if (ws && ws.connected) ws.disconnect();
+    ws = null;
+  }
+
+  async function initAudio() {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 16000,
+      });
+    }
+  }
+
+  async function startAndStopListening(command) {
+    if (command === "start") {
+      // countdownElement.classList.remove("hidden");
+      getDateDiv.innerHTML = `<div class="badge badge-ghost">${new Date().toString().split(" GMT")[0]}</div>`;
+      startListening.classList.add("hidden");
+      stopListening.classList.remove("!btn-disabled", "hidden");
+      // pauseListening.classList.remove("hidden", "btn-disabled");
+      try {
+        if (!isAlreadyStart) {
+          resetWebSocket();
+          initWebSocket();
+        }
+        ws.emit("startTranscription");
+        await cleanupAudioResources();
+        await initAudio();
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+
+        while (audioContext === null) {
+          await initAudio();
+        }
+        audioContext = new AudioContext();
+        audioInput = audioContext.createMediaStreamSource(micStream);
+        processor = audioContext.createScriptProcessor(1024, 1, 1);
+        audioInput.connect(processor);
+        processor.connect(audioContext.destination);
+
+        processor.onaudioprocess = (e) => {
+          const float32Array = e.inputBuffer.getChannelData(0);
+          const int16Array = new Int16Array(float32Array.length);
+          for (let i = 0; i < float32Array.length; i++) {
+            int16Array[i] = Math.max(
+              -32768,
+              Math.min(32767, Math.floor(float32Array[i] * 32768)),
+            );
+          }
+          console.log(
+            "Sending audio chunk to server, size:",
+            int16Array.buffer.byteLength,
+          );
+          ws.emit("audioData", int16Array.buffer);
+        };
+      } catch (error) {
+        console.error(error);
+        await cleanupAudioResources();
+      }
+    } else if (command === "stop" || command === "end") {
+      isAlreadyStart = false;
+      await cleanupAudioResources();
+      resetWebSocket();
+      handleStop();
+      if (
+        command === "end" &&
+        !window.location.href.includes("dashboard.html")
+      ) {
+        endMeetingDiv.innerHTML = loadingDiv;
+        endMeetingDiv.classList.add("!btn-disabled");
+        await handleSummarize(`${today} 00:00:00`, `${today} 23:59:59`);
+        const items = ["meetingName", "meetingTopic", "id"];
+        items.forEach((item) => localStorage.removeItem(item));
+        try {
+          if (!window.location.href.includes("dashboard.html")) {
+            location.replace("dashboard.html");
+          }
+          endMeetingDiv.innerHTML = `<i class="fa-solid fa-arrow-left"></i> End Meeting`;
+          endMeetingDiv.classList.remove("!btn-disabled");
+        } catch (e) {
+          console.error(e);
+          endMeetingDiv.innerHTML = `<i class="fa-solid fa-arrow-left"></i> End Meeting`;
+          endMeetingDiv.classList.remove("!btn-disabled");
+        }
+      }
+      handleWebSocketCloseOrError(
+        "alert-warning text-black",
+        onCloseDiv,
+        "listen",
+      );
+    } else if (command === "pause") {
+      isAlreadyStart = true;
+      micStream?.getTracks().forEach((track) => track.stop());
+      micStream = null;
+      startListening.classList.remove("hidden");
+      startListening.innerHTML = `<i class="fa-solid fa-play fa-sm" style="color: #ffffff"></i>Continue Listening`;
+      stopListening.classList.add("hidden");
+      // pauseListening.classList.add("hidden");
+    }
+  }
+
+  async function handleSummarize(start_datetime, end_datetime) {
+    const API_BASE_URL = "http://192.168.1.50:19110/api";
+    const formData = new FormData();
+    formData.append(
+      "start_date",
+      start_datetime ? start_datetime : `${today} 00:00:00`,
+    );
+    formData.append(
+      "end_date",
+      end_datetime ? end_datetime : `${today} 23:59:59`,
+    );
+    formData.append("engine", "vertex_flash_15_200");
+    summarizeButtonDiv.classList.add("!btn-disabled");
+    summaryDiv.innerHTML = loadingSpinner;
+    summarizeButtonDiv.innerHTML = loadingSpinner;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/transcribe/summary/${username}/${id}/summarize`,
+        {
+          method: "POST",
+          // Set the FormData instance as the request body
+          body: formData,
+        },
+      );
+
+      const res = await response.json();
+      summaryDiv.innerHTML = res.result.response ? res.result.response : "";
+      summaryDiv.classList = "text-black text-sm";
+      resetSummarizeButton();
+    } catch (e) {
+      console.error(e);
+      resetSummarizeButton();
+      handleWebSocketCloseOrError(
+        "alert-error text-white",
+        onErrorDiv,
+        "summary",
+      );
+    }
+  }
+
+  async function handleLog(isi_mentah) {
+    const API_BASE_URL = "http://192.168.1.50:19110/api";
+    const formData = new FormData();
+    formData.append("username", username);
+    formData.append("meeting", id);
+    formData.append("raw_input", isi_mentah);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/transcribe/log/${username}/${id}`,
+        {
+          method: "POST",
+          // Set the FormData instance as the request body
+          body: formData,
+        },
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  }
+</script>
