@@ -569,18 +569,15 @@
       await cleanupAudioResources();
       resetWebSocket();
       handleStop();
-      if (
-        command === "end" &&
-        !window.location.href.includes("dashboard.html")
-      ) {
+      if (command === "end" && !window.location.href.includes("dashboard")) {
         endMeetingDiv.innerHTML = loadingDiv;
         endMeetingDiv.classList.add("!btn-disabled");
         await handleSummarize(`${today} 00:00:00`, `${today} 23:59:59`);
         const items = ["meetingName", "meetingTopic", "id"];
         items.forEach((item) => localStorage.removeItem(item));
         try {
-          if (!window.location.href.includes("dashboard.html")) {
-            location.replace("dashboard.html");
+          if (!window.location.href.includes("dashboard")) {
+            location.replace("dashboard");
           }
           endMeetingDiv.innerHTML = `<i class="fa-solid fa-arrow-left"></i> End Meeting`;
           endMeetingDiv.classList.remove("!btn-disabled");

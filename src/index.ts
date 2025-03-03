@@ -33,17 +33,24 @@ const io = new Server(server, {
   },
 });
 
-app.use(express.static(path.join(__dirname, "")));
+app.set("view engine", "ejs");
 
-/* Define a route for the root path ("/")
- using the HTTP GET method */
+app.use(express.static(path.join(__dirname, "public")));
+
 app.get("/", (req: Request, res: Response) => {
-  res.send("Express + Typescript Server");
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
-app.get("/test", (req, res) => {
-  // Send the HTML file as the response
-  res.sendFile(path.join(__dirname, "client.html"));
+app.get("/:page", (req: Request, res: Response) => {
+  const slug = ["client", "dashboard", "login"];
+  const filename = req.params.page;
+  res.sendFile(
+    path.join(
+      __dirname,
+      "public",
+      slug.includes(filename) ? `${filename}.html` : "login.html",
+    ),
+  );
 });
 
 const transcribeClient = new TranscribeStreamingClient({
