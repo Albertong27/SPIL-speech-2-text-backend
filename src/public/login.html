@@ -75,6 +75,7 @@
 </html>
 
 <script src="together.js"></script>
+<script src="sha-1.js"></script>
 <script>
   const API_BASE_URL = "http://192.168.1.50:19110/api";
   const form = document.querySelector("#userinfo");
@@ -92,8 +93,12 @@
     // Associate the FormData object with the form element
     const formData = new FormData(form);
     // const hashedPassword = await hashPassword(formData.get("password"));
-    // formData.set("password", hashedPassword);
-    formData.append("is_encrypted", "0");
+    formData.set(
+      "password",
+      CryptoJS.SHA1(formData.get("password")).toString(),
+    );
+    console.log(CryptoJS.SHA1(formData.get("password")).toString())
+    formData.append("is_encrypted", "1");
 
     try {
       const response = await fetch(`${API_BASE_URL}/transcribe/login`, {
