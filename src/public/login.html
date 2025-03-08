@@ -42,7 +42,7 @@
           required
           name="username"
           type="text"
-          placeholder="Enter your email"
+          placeholder="Enter your username"
           class="input input-bordered w-full max-w-xs"
           autocomplete="off"
         />
@@ -79,21 +79,21 @@
   const API_BASE_URL = "http://192.168.1.50:19110/api";
   const form = document.querySelector("#userinfo");
 
-  async function hashPassword(password) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-    return Array.from(new Uint8Array(hashBuffer))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
+  // async function hashPassword(password) {
+  //   const encoder = new TextEncoder();
+  //   const data = encoder.encode(password);
+  //   const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+  //   return Array.from(new Uint8Array(hashBuffer))
+  //     .map((b) => b.toString(16).padStart(2, "0"))
+  //     .join("");
+  // }
 
   async function sendData() {
     // Associate the FormData object with the form element
     const formData = new FormData(form);
-    const hashedPassword = await hashPassword(formData.get("password"));
-    formData.set("password", hashedPassword);
-    formData.append("is_encrypted", "1");
+    // const hashedPassword = await hashPassword(formData.get("password"));
+    // formData.set("password", hashedPassword);
+    formData.append("is_encrypted", "0");
 
     try {
       const response = await fetch(`${API_BASE_URL}/transcribe/login`, {
