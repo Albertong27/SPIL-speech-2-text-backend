@@ -257,7 +257,6 @@
   async function renderSummary(id, meetingId) {
     const summaryElement = document.getElementById("summary");
     const data = await fetchData(`summary/${meetingId}/${id}`);
-    console.log(meetingId);
     if (!data.length) return;
 
     summaryElement.innerHTML = "";

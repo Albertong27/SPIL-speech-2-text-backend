@@ -97,7 +97,6 @@
       "password",
       CryptoJS.SHA1(formData.get("password")).toString(),
     );
-    console.log(CryptoJS.SHA1(formData.get("password")).toString())
     formData.append("is_encrypted", "1");
 
     try {
