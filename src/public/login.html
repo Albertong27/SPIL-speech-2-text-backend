@@ -61,12 +61,14 @@
         />
       </label>
       <button
+        id="login-button"
         type="submit"
         value="submit"
         class="btn w-full !bg-[#16A34A] !text-white"
       >
         Login
       </button>
+      <p id="login-status" class="text-red-500 text-center !mt-2 hidden"></p>
     </form>
   </body>
   <p class="absolute bottom-8 left-1/2 -translate-x-1/2 transform">
@@ -79,6 +81,8 @@
 <script>
   const API_BASE_URL = "http://192.168.1.50:19110/api";
   const form = document.querySelector("#userinfo");
+  const loginButton = document.getElementById("login-button");
+  const loginStatus = document.getElementById("login-status");
 
   // async function hashPassword(password) {
   //   const encoder = new TextEncoder();
@@ -90,6 +94,7 @@
   // }
 
   async function sendData() {
+    loginButton.innerHTML = `<span class="loading loading-spinner"></span>`;
     // Associate the FormData object with the form element
     const formData = new FormData(form);
     // const hashedPassword = await hashPassword(formData.get("password"));
@@ -110,6 +115,10 @@
       if (res.status === "success") {
         localStorage.setItem("result", res.result[0].USERNAME);
         location.replace("dashboard");
+      } else if (res.detail === "Invalid username or password") {
+        loginButton.innerHTML = "Login";
+        loginStatus.classList.remove("hidden");
+        loginStatus.textContent = res.detail;
       }
     } catch (e) {
       console.error(e);

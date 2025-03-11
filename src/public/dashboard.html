@@ -44,6 +44,7 @@
             <tr>
               <th></th>
               <th>Meeting Name</th>
+              <th>Meeting Topic</th>
               <th>Date</th>
               <!-- Room Name -->
               <!-- <th>ID</th>
@@ -212,18 +213,39 @@
 
     tableMeeting.innerHTML = data
       .map(
-        (item, index) => `
-    <tr>
-      <th>${index + 1}</th>
-      <td>${item.ROOM_NAME}</td>
-      <td>${item.CREATED_ON}</td>
-      <td class="flex justify-end">
-        <button class="btn !bg-[#16A34A] !text-white" onclick="renderTableSummary('${username}', '${item.ID}'); my_modal_1.showModal();">
-          Summary
-        </button>
-      </td>
-    </tr>
-  `,
+        (item, index) =>
+          `
+        <tr>
+          <th>${index + 1}</th>
+          <td>${item.ROOM_NAME}</td>
+          <td>?</td>
+          <td>${item.CREATED_ON.slice(0, -3)}</td>
+          <td class="flex gap-3 justify-end">
+            <button class="btn !bg-[#16A34A] !text-white" onclick="renderTableSummary('${username}', '${item.ID}'); my_modal_1.showModal();">
+              Summary
+            </button>
+            ${[
+              {
+                btn_class:
+                  "!border !border-blue-900 !bg-blue-50 !text-blue-500",
+                btn_icon: "fa-edit",
+              },
+              {
+                btn_class: "!border !border-red-900 !bg-red-50 !text-red-500",
+                btn_icon: "fa-trash",
+              },
+            ]
+              .map(
+                (x, index) => `
+                <button key={index} class="btn btn-square ${x.btn_class}">
+                  <i class="fas ${x.btn_icon}"></i>
+                </button>
+              `,
+              )
+              .join("")}
+          </td>
+        </tr>
+      `,
       )
       .join("");
   }
@@ -241,7 +263,7 @@
       <tr>
         <td>${item.RAW_START_TIME}</td>
         <td>${item.RAW_END_TIME}</td>
-        <td>${item.CREATED_ON}</td>
+        <td>${item.CREATED_ON.slice(0, -3)}</td>
         <td>${item.CREATED_BY}</td>
         <td class="flex justify-end">
           <button class="btn btn-square !bg-[#16A34A] !text-white" onclick="renderSummary('${item.ID}', '${meetingId}'); my_modal_2.showModal();">
