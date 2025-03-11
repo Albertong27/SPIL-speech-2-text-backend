@@ -35,14 +35,8 @@ git checkout ts-node-express
 
 Install the project dependencies including TypeScript and Nodemon:
 
-Mandatory:
 ```
 npm i
-```
-
-Optional (New Terminal):
-```
-npx tailwindcss -i ./src/public/input.css -o ./src/public/output.css --watch
 ```
 
 ## Usage
@@ -51,6 +45,11 @@ For development purposes, you can run the application using Nodemon to automatic
 
 ```
 npm run dev
+```
+
+New Terminal (optional):
+```
+npx tailwindcss -i ./src/public/input.css -o ./src/public/output.css --watch
 ```
 
 This will start the server at `http://localhost:3000` by default. You can change the port in the `src/index.ts` file or create an `.env` file to manage the environt-specific variables separately.
