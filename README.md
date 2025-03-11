@@ -20,7 +20,7 @@ Before you begin, ensure you have the following installed on your machine:
 Clone the repository to your local machine:
 
 ```
-git clone https://github.com/c99rahul/ts-node-express.git
+git clone https://github.com/Albertong27/SPIL-speech-2-text-backend
 ```
 
 Navigate to the project directory:
@@ -29,10 +29,20 @@ Navigate to the project directory:
 cd ts-node-express/
 ```
 
+```
+git checkout ts-node-express
+```
+
 Install the project dependencies including TypeScript and Nodemon:
 
+Mandatory:
 ```
 npm i
+```
+
+Optional (New Terminal):
+```
+npx tailwindcss -i ./src/public/input.css -o ./src/public/output.css --watch
 ```
 
 ## Usage
@@ -57,10 +67,19 @@ npm start
 The project structure is organized as follows:
 
 - `src`: Contains TypeScript source files
+  - `public`:
+    - client.html
+    - dashboard.html
+    - input.css
+    - login.html
+    - output.css
+    - sha-1.js
+    - together.js
   - `index.ts`: Configures and starts the Express application
 - `dist`: Output directory created during build for compiled TypeScript files
 - `package.json`: Project configuration and dependencies
 - `tsconfig.json`: TypeScript configuration
+- `tailwind.config.js`
 
 You can customize the project configuration i nthe `tsconfig.json` file and adjust the server settings in the `src/index.ts` file.
 
